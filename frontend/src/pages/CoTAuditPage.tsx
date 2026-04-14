@@ -4,8 +4,9 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type SafetyEval, type Eval } from "../lib/api";
+import { api, type SafetyEval, type Eval, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
+import SafetySourceCard from "../components/SafetySourceCard";
 
 interface CoTStepAudit {
   step_k: number;
@@ -135,7 +136,12 @@ export default function CoTAuditPage() {
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<CoTResult | null>(null);
 
-  useEffect(() => { api.listEvals(20).then(setEvals).catch(() => {}); }, []);
+  const [standard, setStandard] = useState<SafetyStandard | null>(null);
+
+  useEffect(() => {
+    api.listEvals(20).then(setEvals).catch(() => {});
+    api.getSafetyStandards().then(ss => setStandard(ss.find(s => s.eval_type === "cot_audit") ?? null)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!safety_id) return;
@@ -180,6 +186,7 @@ export default function CoTAuditPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+        {standard && <SafetySourceCard standard={standard} />}
         <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">

@@ -36,6 +36,7 @@ from pydantic import BaseModel
 
 from agent_eval.api.settings import settings
 from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
+from agent_eval.safety_standards import SAFETY_EVAL_STANDARDS
 from agent_eval.storage.sqlite_store import SqliteStore
 from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
 from agent_eval.consistency import BUILTIN_TASKS_BY_ID as CONSISTENCY_TASKS, run_consistency_probe
@@ -274,6 +275,12 @@ def create_backdoor_scan(req: BackdoorScanRequest, background: BackgroundTasks) 
         base_url=req.base_url or settings.openai_base_url,
     )
     return record
+
+
+@router.get("/standards")
+def list_safety_standards():
+    """Return the full citation registry for all second-type threat detection methods."""
+    return SAFETY_EVAL_STANDARDS
 
 
 def _run_backdoor_scan_bg(safety_id, task_id, trigger_ids, model, api_key, base_url):

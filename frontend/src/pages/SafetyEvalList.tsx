@@ -4,8 +4,9 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type SafetyEval } from "../lib/api";
+import { api, type SafetyEval, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
+import SafetySourceCard from "../components/SafetySourceCard";
 
 function fmtDate(iso: string) {
   try {
@@ -31,6 +32,7 @@ const STATUS_STYLE: Record<string, string> = {
 export default function SafetyEvalList() {
   const navigate = useNavigate();
   const [evals, setEvals] = useState<SafetyEval[]>([]);
+  const [standards, setStandards] = useState<SafetyStandard[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -39,6 +41,7 @@ export default function SafetyEvalList() {
 
   useEffect(() => {
     load();
+    api.getSafetyStandards().then(setStandards).catch(() => {});
     const iv = setInterval(load, 5000);
     return () => clearInterval(iv);
   }, [load]);
@@ -73,6 +76,18 @@ export default function SafetyEvalList() {
             </button>
           ))}
         </div>
+
+        {/* Standards citation section */}
+        {standards.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">各测评方法学术出处</h2>
+            <div className="space-y-2">
+              {standards.map(s => (
+                <SafetySourceCard key={s.id} standard={s} defaultOpen={false} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Recent safety evals */}
         <h2 className="text-sm font-bold text-gray-700 mb-3">最近的安全检测</h2>

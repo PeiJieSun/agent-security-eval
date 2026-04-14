@@ -120,6 +120,27 @@ export type ConsistencyTaskInfo = {
   variants: Array<{ id: string; instruction: string }>;
 };
 
+export type SafetyStandard = {
+  id: string;
+  eval_type: string;
+  name: string;
+  name_en: string;
+  milestone: string;
+  definition: string;
+  definition_zh: string;
+  source: string;
+  source_full: string;
+  authors: string;
+  venue: string;
+  arxiv_id: string;
+  url: string;
+  url_secondary?: string;
+  verbatim_quote: string;
+  bibtex: string;
+  threshold: string;
+  tags: string[];
+};
+
 // ── HTTP helper ───────────────────────────────────────────────────────────
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -189,4 +210,7 @@ export const api = {
   createBackdoorScan: (body: { task_id: string; trigger_ids?: string[]; model?: string; api_key?: string; base_url?: string }) =>
     req<SafetyEval>("/safety-evals/backdoor-scan", { method: "POST", body: JSON.stringify(body) }),
   listConsistencyTasks: () => req<ConsistencyTaskInfo[]>("/safety-evals/consistency-tasks/list"),
+
+  // Safety standards citation registry
+  getSafetyStandards: () => req<SafetyStandard[]>("/safety-evals/standards"),
 };

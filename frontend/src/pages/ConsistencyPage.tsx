@@ -4,8 +4,9 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type SafetyEval, type ConsistencyTaskInfo } from "../lib/api";
+import { api, type SafetyEval, type ConsistencyTaskInfo, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
+import SafetySourceCard from "../components/SafetySourceCard";
 
 function ResultView({ result }: { result: Record<string, unknown> }) {
   const mean = result.mean_jaccard as number;
@@ -92,9 +93,11 @@ export default function ConsistencyPage() {
   const [running, setRunning] = useState(false);
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [standard, setStandard] = useState<SafetyStandard | null>(null);
 
   useEffect(() => {
     api.listConsistencyTasks().then(setTasks).catch(() => {});
+    api.getSafetyStandards().then(ss => setStandard(ss.find(s => s.eval_type === "consistency") ?? null)).catch(() => {});
   }, []);
 
   // If viewing existing eval
@@ -139,6 +142,9 @@ export default function ConsistencyPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+        {/* Academic source */}
+        {standard && <SafetySourceCard standard={standard} />}
+
         {/* Theory box */}
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
           <p className="font-semibold mb-1">原理</p>

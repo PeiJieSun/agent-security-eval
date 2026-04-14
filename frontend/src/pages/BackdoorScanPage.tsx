@@ -4,8 +4,9 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type SafetyEval, type TaskInfo } from "../lib/api";
+import { api, type SafetyEval, type TaskInfo, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
+import SafetySourceCard from "../components/SafetySourceCard";
 
 interface TriggerResult {
   trigger_id: string;
@@ -139,8 +140,12 @@ export default function BackdoorScanPage() {
   const [running, setRunning] = useState(false);
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [standard, setStandard] = useState<SafetyStandard | null>(null);
 
-  useEffect(() => { api.listTasks().then(setTasks).catch(() => {}); }, []);
+  useEffect(() => {
+    api.listTasks().then(setTasks).catch(() => {});
+    api.getSafetyStandards().then(ss => setStandard(ss.find(s => s.eval_type === "backdoor_scan") ?? null)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!safety_id) return;
@@ -187,6 +192,7 @@ export default function BackdoorScanPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+        {standard && <SafetySourceCard standard={standard} />}
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">

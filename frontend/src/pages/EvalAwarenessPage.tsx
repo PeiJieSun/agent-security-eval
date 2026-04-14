@@ -4,8 +4,9 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type SafetyEval, type TaskInfo } from "../lib/api";
+import { api, type SafetyEval, type TaskInfo, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
+import SafetySourceCard from "../components/SafetySourceCard";
 
 function DistBar({ dist }: { dist: Record<string, number> }) {
   const total = Object.values(dist).reduce((a, b) => a + b, 0);
@@ -81,8 +82,12 @@ export default function EvalAwarenessPage() {
   const [running, setRunning] = useState(false);
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [standard, setStandard] = useState<SafetyStandard | null>(null);
 
-  useEffect(() => { api.listTasks().then(setTasks).catch(() => {}); }, []);
+  useEffect(() => {
+    api.listTasks().then(setTasks).catch(() => {});
+    api.getSafetyStandards().then(ss => setStandard(ss.find(s => s.eval_type === "eval_awareness") ?? null)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!safety_id) return;
@@ -126,6 +131,7 @@ export default function EvalAwarenessPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+        {standard && <SafetySourceCard standard={standard} />}
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">
