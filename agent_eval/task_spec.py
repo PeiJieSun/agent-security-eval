@@ -117,3 +117,4 @@ class EvalTask(BaseModel):
     attack_type: str = "data_stealing"
     tags: list[str] = []
     max_steps: int = 10
+    source: str = "custom"  # "custom" | "agentdojo" | "injecagent"

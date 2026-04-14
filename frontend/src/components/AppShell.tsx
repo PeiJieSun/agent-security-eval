@@ -54,6 +54,13 @@ const NAV: NavSection[] = [
       { label: "长期趋势", path: "/behavior/trend" },
     ],
   },
+  {
+    heading: "MCP 安全",
+    badge: "协议层攻击",
+    items: [
+      { label: "工具投毒检测", path: "/mcp-security" },
+    ],
+  },
 ];
 
 const BOTTOM_NAV: NavItem[] = [{ label: "LLM 配置", path: "/settings" }];

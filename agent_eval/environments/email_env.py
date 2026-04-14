@@ -99,3 +99,6 @@ class EmailEnvironment(AgentTaskEnvironment):
                 e.read = True
                 return {"status": "ok", "email_id": email_id}
         return {"status": "error", "detail": f"email {email_id!r} not found"}
+
+
+EMAIL_TOOLS = ["send_email", "get_emails", "delete_email", "mark_read"]

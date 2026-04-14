@@ -38,8 +38,16 @@ from agent_eval.storage.sqlite_store import SqliteStore
 from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID as _EMAIL_TASKS
 from agent_eval.tasks.research_tasks import RESEARCH_TASKS_BY_ID as _RESEARCH_TASKS
 from agent_eval.tasks.chinese_tasks import CHINESE_TASKS_BY_ID as _CHINESE_TASKS
+from agent_eval.tasks.agentdojo_adapter import AGENTDOJO_TASKS_BY_ID as _AGENTDOJO_TASKS
+from agent_eval.tasks.injecagent_adapter import INJECAGENT_TASKS_BY_ID as _INJECAGENT_TASKS
 
-DEMO_TASKS_BY_ID = {**_EMAIL_TASKS, **_RESEARCH_TASKS, **_CHINESE_TASKS}
+DEMO_TASKS_BY_ID = {
+    **_EMAIL_TASKS,
+    **_RESEARCH_TASKS,
+    **_CHINESE_TASKS,
+    **_AGENTDOJO_TASKS,
+    **_INJECAGENT_TASKS,
+}
 
 import time
 
@@ -127,8 +135,25 @@ def get_metric_standards() -> list[dict]:
 # ── Built-in tasks ────────────────────────────────────────────────────────
 
 @router.get("/tasks")
-def list_tasks() -> list[dict]:
-    """List built-in evaluation tasks (summary)."""
+def list_tasks(
+    source: Optional[str] = None,
+    environment_type: Optional[str] = None,
+    attack_type: Optional[str] = None,
+    limit: int = 200,
+) -> list[dict]:
+    """
+    List built-in evaluation tasks.
+
+    Supports filtering by source (custom|agentdojo|injecagent),
+    environment_type (email|calendar|filesystem), and attack_type.
+    """
+    tasks = list(DEMO_TASKS_BY_ID.values())
+    if source:
+        tasks = [t for t in tasks if t.source == source]
+    if environment_type:
+        tasks = [t for t in tasks if t.environment_type == environment_type]
+    if attack_type:
+        tasks = [t for t in tasks if t.attack_type == attack_type]
     return [
         {
             "task_id": t.task_id,
@@ -137,14 +162,14 @@ def list_tasks() -> list[dict]:
             "tags": t.tags,
             "environment_type": t.environment_type,
             "user_instruction": t.user_instruction,
-            "attack_payload": t.attack_vector.payload,
+            "attack_payload": t.attack_vector.payload[:200] if t.attack_vector.payload else "",
             "attack_target_tool": t.attack_vector.target_tool,
             "injection_style": t.attack_vector.style.value,
             "benign_success_expr": t.benign_success_expr,
             "attack_success_expr": t.attack_success_expr,
-            "inbox_preview": t.environment_config.get("inbox", [])[:2],
+            "source": t.source,
         }
-        for t in DEMO_TASKS_BY_ID.values()
+        for t in tasks[:limit]
     ]
 
 

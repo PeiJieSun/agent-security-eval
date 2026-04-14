@@ -19,6 +19,7 @@ import EvoAttackPage from "./pages/EvoAttackPage";
 import ReleaseGatePage from "./pages/ReleaseGatePage";
 import BehaviorTrendPage from "./pages/BehaviorTrendPage";
 import BatchEvalPage from "./pages/BatchEvalPage";
+import MCPSecurityPage from "./pages/MCPSecurityPage";
 
 export default function App() {
   return (
@@ -61,6 +62,8 @@ export default function App() {
           {/* M3-5 */}
           <Route path="/behavior/trend" element={<BehaviorTrendPage />} />
           <Route path="/behavior/trend/:task_id" element={<BehaviorTrendPage />} />
+          {/* M4-4 */}
+          <Route path="/mcp-security" element={<MCPSecurityPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
