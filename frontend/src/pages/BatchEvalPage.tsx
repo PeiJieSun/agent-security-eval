@@ -53,11 +53,12 @@ function StatusChip({ status }: { status: string }) {
     done_with_errors: "text-amber-700 border-amber-200 bg-amber-50",
     failed: "text-red-700 border-red-200 bg-red-50",
     cancelled: "text-slate-500 border-slate-200 bg-slate-50",
+    interrupted: "text-amber-700 border-amber-200 bg-amber-50",
     pending: "text-slate-500 border-slate-200 bg-slate-50",
   };
   const label: Record<string, string> = {
     running: "运行中", done: "完成", done_with_errors: "完成(含错误)",
-    failed: "失败", cancelled: "已停止", pending: "等待",
+    failed: "失败", cancelled: "已停止", interrupted: "中断（重启）", pending: "等待",
   };
   return (
     <span className={`text-[11px] px-2 py-0.5 rounded border flex items-center gap-1.5 ${map[status] ?? "bg-slate-50 text-slate-500 border-slate-200"}`}>
@@ -102,9 +103,21 @@ function AnimatedProgressBar({ done, total, failed }: { done: number; total: num
   );
 }
 
-function RunningTaskList({ tasks }: { tasks: string[] }) {
+function RunningTaskList({ tasks, updatedAt }: { tasks: string[]; updatedAt?: string }) {
+  // Detect stale: last update > 60s ago with no running tasks = backend restarted mid-run
+  const isStale = (() => {
+    if (!updatedAt || tasks.length > 0) return false;
+    const age = (Date.now() - new Date(updatedAt).getTime()) / 1000;
+    return age > 60;
+  })();
+
+  if (isStale) return (
+    <p className="text-[11px] text-amber-600 italic">
+      ⚠ 检测到后端已重启，该批次线程已中断。请点击「■ 停止」标记为结束，然后重新发起。
+    </p>
+  );
   if (tasks.length === 0) return (
-    <p className="text-[11px] text-slate-400 italic">等待启动并发 worker…</p>
+    <p className="text-[11px] text-slate-400 italic animate-pulse">正在启动并发 worker…</p>
   );
   return (
     <div className="space-y-1">
@@ -338,7 +351,10 @@ export default function BatchEvalPage() {
               <p className="text-[11px] text-slate-400 uppercase tracking-wide">
                 当前并发任务（{activeBatch.running_tasks?.length ?? 0}/4 worker）
               </p>
-              <RunningTaskList tasks={activeBatch.running_tasks ?? []} />
+              <RunningTaskList
+                tasks={activeBatch.running_tasks ?? []}
+                updatedAt={activeBatch.updated_at}
+              />
             </div>
           )}
 

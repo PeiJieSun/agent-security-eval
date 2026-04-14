@@ -19,12 +19,22 @@ from agent_eval.api.routers import eval as eval_router
 from agent_eval.api.routers import safety_evals as safety_router
 from agent_eval.api.routers import mcp_eval as mcp_router
 from agent_eval.api.routers import sandbox as sandbox_router
+from agent_eval.storage.sqlite_store import SqliteStore
 
 app = FastAPI(
     title="Agent Security Eval API",
     version="0.1.0",
     description="Evaluation runs, trajectory recording, and security scoring for LLM agents.",
 )
+
+
+@app.on_event("startup")
+def _cleanup_stale_batches() -> None:
+    """Mark any batch still marked 'running' in DB as interrupted (thread was killed by restart)."""
+    store = SqliteStore()
+    for batch in store.list_batches(limit=100):
+        if batch["status"] == "running":
+            store.update_batch(batch["batch_id"], status="interrupted")
 
 app.add_middleware(
     CORSMiddleware,
