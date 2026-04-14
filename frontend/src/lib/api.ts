@@ -144,4 +144,11 @@ export const api = {
   // Tasks
   listTasks: () => req<TaskInfo[]>("/tasks"),
   getTask: (task_id: string) => req<TaskInfo>(`/tasks/${task_id}`),
+
+  // Connection test
+  testConnection: (body: { api_key?: string; base_url?: string; model?: string }) =>
+    req<{ ok: boolean; model?: string; latency_ms?: number; reply?: string; error?: string }>(
+      "/test-connection",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
 };

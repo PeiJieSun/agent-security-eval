@@ -34,6 +34,8 @@ from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
 from agent_eval.storage.sqlite_store import SqliteStore
 from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
 
+import time
+
 router = APIRouter(prefix="/api/v1/agent-eval")
 _store = SqliteStore()
 
@@ -45,6 +47,55 @@ class CreateEvalRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+
+
+class TestConnectionRequest(BaseModel):
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+# ── Connectivity test ────────────────────────────────────────────────────
+
+@router.post("/test-connection")
+def test_connection(req: TestConnectionRequest) -> dict:
+    """
+    Test LLM connectivity by sending a minimal chat request.
+    Returns latency_ms and model info on success; error detail on failure.
+    """
+    api_key = req.api_key or settings.openai_api_key
+    base_url = req.base_url or settings.openai_base_url
+    model = req.model or settings.default_model
+
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="未提供 API Key，请填写 api_key 或设置 OPENAI_API_KEY 环境变量。",
+        )
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openai 包未安装，请运行 pip install openai")
+
+    try:
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        t0 = time.monotonic()
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Reply with the single word: pong"}],
+            max_tokens=5,
+            temperature=0,
+        )
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {
+            "ok": True,
+            "model": resp.model,
+            "latency_ms": latency_ms,
+            "reply": resp.choices[0].message.content.strip() if resp.choices else "",
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 # ── Metric Standards (no DB) ──────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type TaskInfo } from "../lib/api";
-import { loadSettings, hasApiKey } from "../lib/settings";
+import { loadSettings, hasApiKey, getActiveProfile } from "../lib/settings";
 
 const ATTACK_TYPE_LABEL: Record<string, string> = {
   data_stealing: "数据窃取",
@@ -201,13 +201,20 @@ export default function NewEval() {
           {/* Model + API config */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">LLM 配置</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">LLM 配置</h3>
+                {getActiveProfile() && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    使用配置：<span className="font-medium text-gray-600">{getActiveProfile()!.name}</span>
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => navigate("/settings")}
                 className="text-xs text-rose-600 hover:underline"
               >
-                去设置页 →
+                管理配置 →
               </button>
             </div>
 
