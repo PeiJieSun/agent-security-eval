@@ -266,4 +266,11 @@ export const api = {
   getBehaviorTrend: (task_id: string) =>
     req<{ task_id: string; snapshot_count: number; snapshots: { eval_id: string; created_at: string; benign_utility: number; targeted_asr: number; utility_under_attack: number; tool_dist: Record<string, number> }[]; drift_detected: boolean; drift_score: number; kl_divergence: number; asr_slope: number; utility_slope: number; summary: string }>(`/behavior-trend/${task_id}`),
   listBehaviorTasks: () => req<{ task_id: string; snapshot_count: number }[]>("/behavior-trend/tasks"),
+
+  // Backend settings persistence
+  getSettings: () => req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>("/settings"),
+  updateSettings: (body: { api_key?: string; base_url?: string; model?: string }) =>
+    req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>(
+      "/settings", { method: "PUT", body: JSON.stringify(body) }
+    ),
 };

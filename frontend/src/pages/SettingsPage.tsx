@@ -345,19 +345,48 @@ type EditingState =
   | { mode: "add" }
   | { mode: "edit"; profile: LLMProfile };
 
+async function syncActiveProfileToBackend(profiles: LLMProfile[]) {
+  const active = profiles.find((p) => p.isActive) ?? profiles[0];
+  if (!active) return;
+  await api.updateSettings({
+    api_key: active.apiKey,
+    base_url: active.baseUrl,
+    model: active.model,
+  });
+}
+
 export default function SettingsPage() {
   const [profiles, setProfiles] = useState<LLMProfile[]>([]);
   const [editing, setEditing] = useState<EditingState>({ mode: "none" });
+  const [backendStatus, setBackendStatus] = useState<"idle" | "syncing" | "ok" | "err">("idle");
+  const [backendInfo, setBackendInfo] = useState<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string } | null>(null);
 
   useEffect(() => {
     setProfiles(loadProfiles());
+    api.getSettings().then(setBackendInfo).catch(() => {});
   }, []);
 
   const refresh = () => setProfiles(loadProfiles());
 
+  const pushToBackend = async (updated: LLMProfile[]) => {
+    setBackendStatus("syncing");
+    try {
+      const res = await syncActiveProfileToBackend(updated);
+      void res;
+      const info = await api.getSettings();
+      setBackendInfo(info);
+      setBackendStatus("ok");
+    } catch {
+      setBackendStatus("err");
+    }
+    setTimeout(() => setBackendStatus("idle"), 3000);
+  };
+
   const handleActivate = (id: string) => {
     setActiveProfile(id);
-    refresh();
+    const next = loadProfiles().map((p) => ({ ...p, isActive: p.id === id }));
+    setProfiles(next);
+    pushToBackend(next);
   };
 
   const handleDelete = (id: string) => {
@@ -366,23 +395,42 @@ export default function SettingsPage() {
   };
 
   const handleSaveNew = (p: Omit<LLMProfile, "id" | "isActive">) => {
-    addProfile({ ...p, isActive: profiles.length === 0 });
-    refresh();
+    const isFirst = profiles.length === 0;
+    addProfile({ ...p, isActive: isFirst });
+    const next = loadProfiles();
+    setProfiles(next);
     setEditing({ mode: "none" });
+    if (isFirst) pushToBackend(next);
   };
 
   const handleSaveEdit = (orig: LLMProfile, p: Omit<LLMProfile, "id" | "isActive">) => {
     updateProfile({ ...orig, ...p });
-    refresh();
+    const next = loadProfiles();
+    setProfiles(next);
     setEditing({ mode: "none" });
+    if (orig.isActive) pushToBackend(next);
   };
 
   return (
     <div className="px-8 py-7 max-w-2xl mx-auto">
         <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">LLM 配置</h1>
         <p className="text-[12px] text-slate-400 mb-6">
-          支持配置多个 LLM 接入点，单选"默认"后评测自动使用该配置。配置保存在浏览器本地，不上传服务器。
+          支持配置多个 LLM 接入点，单选"默认"后评测自动使用该配置。设为默认时自动同步至后端，评测运行无需再填写 API Key。
         </p>
+
+        {/* Backend sync status */}
+        <div className="mb-4 flex items-center gap-3 px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">
+          <span className="text-slate-400">后端状态：</span>
+          {backendStatus === "syncing" && <span className="text-blue-500">同步中…</span>}
+          {backendStatus === "ok" && <span className="text-green-600">✓ 已同步</span>}
+          {backendStatus === "err" && <span className="text-red-500">同步失败</span>}
+          {backendStatus === "idle" && backendInfo && (
+            backendInfo.api_key_set
+              ? <span className="text-green-600">✓ 已配置 · <span className="font-mono">{backendInfo.api_key_masked}</span> · {backendInfo.model}</span>
+              : <span className="text-amber-500">⚠ 后端未配置 API Key</span>
+          )}
+          {backendStatus === "idle" && !backendInfo && <span className="text-slate-400">—</span>}
+        </div>
 
         {/* Profile list */}
         <div className="space-y-3 mb-4">
@@ -435,17 +483,16 @@ export default function SettingsPage() {
           </button>
         )}
 
-        {/* Env var fallback */}
-        <div className="mt-6 border border-slate-200 rounded-lg p-4 text-xs text-slate-600">
-          <p className="font-semibold mb-1">服务端环境变量（永久备用）</p>
-          <pre className="font-mono leading-5">
-{`export OPENAI_API_KEY=sk-...
+        {/* Priority note */}
+        <div className="mt-6 border border-slate-200 rounded-lg p-4 text-xs text-slate-600 space-y-1.5">
+          <p className="font-semibold">配置优先级</p>
+          <p>① 后端配置文件（通过本页面同步）→ ② 环境变量 → ③ 评测表单手填</p>
+          <pre className="font-mono leading-5 bg-slate-50 p-2 rounded mt-1">
+{`# 备用：手动设置环境变量
+export OPENAI_API_KEY=sk-...
 export OPENAI_BASE_URL=https://api.openai.com/v1
 export DEFAULT_MODEL=gpt-4o-mini`}
           </pre>
-          <p className="mt-1 text-blue-500">
-            表单 api_key 优先于服务端环境变量。两者均未填写时评测失败。
-          </p>
         </div>
     </div>
   );

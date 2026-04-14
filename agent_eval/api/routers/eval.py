@@ -81,6 +81,34 @@ class TestConnectionRequest(BaseModel):
     model: Optional[str] = None
 
 
+class UpdateSettingsRequest(BaseModel):
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+# ── Backend settings (persistent) ────────────────────────────────────────
+
+@router.get("/settings")
+def get_settings() -> dict:
+    """Return current backend settings (API key masked)."""
+    return settings.get_public()
+
+
+@router.put("/settings")
+def update_settings(req: UpdateSettingsRequest) -> dict:
+    """
+    Persist LLM settings to backend config file.
+    Saved to agent_eval_settings.json next to the DB.
+    API key is stored server-side and used as default for all eval runs.
+    """
+    return settings.update(
+        api_key=req.api_key or "",
+        base_url=req.base_url or "",
+        model=req.model or "",
+    )
+
+
 # ── Connectivity test ────────────────────────────────────────────────────
 
 @router.post("/test-connection")
