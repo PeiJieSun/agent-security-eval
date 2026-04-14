@@ -102,6 +102,7 @@ class SqliteStore:
                     model       TEXT NOT NULL,
                     status      TEXT NOT NULL DEFAULT 'pending',
                     error       TEXT,
+                    batch_id    TEXT,
                     created_at  TEXT NOT NULL,
                     updated_at  TEXT NOT NULL
                 );
@@ -160,6 +161,10 @@ class SqliteStore:
                     updated_at    TEXT NOT NULL
                 );
             """)
+            # Migration: add batch_id to existing evals table if absent
+            cols = [r[1] for r in con.execute("PRAGMA table_info(evals)").fetchall()]
+            if "batch_id" not in cols:
+                con.execute("ALTER TABLE evals ADD COLUMN batch_id TEXT")
 
     # ── Runs ──────────────────────────────────────────────────────────────
 
@@ -240,17 +245,25 @@ class SqliteStore:
     # ── Evals ─────────────────────────────────────────────────────────────
 
     def create_eval(
-        self, task_id: str, model: str, eval_id: Optional[str] = None
+        self, task_id: str, model: str, eval_id: Optional[str] = None,
+        batch_id: Optional[str] = None,
     ) -> dict:
         eid = eval_id or ("eval_" + uuid.uuid4().hex[:8])
         now = _now()
         with self._conn() as con:
             con.execute(
-                "INSERT INTO evals (eval_id, task_id, model, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, 'pending', ?, ?)",
-                (eid, task_id, model, now, now),
+                "INSERT INTO evals (eval_id, task_id, model, status, batch_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'pending', ?, ?, ?)",
+                (eid, task_id, model, batch_id, now, now),
             )
         return self.get_eval(eid)
+
+    def list_evals_by_batch(self, batch_id: str) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM evals WHERE batch_id=? ORDER BY created_at ASC", (batch_id,)
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def update_eval(
         self,

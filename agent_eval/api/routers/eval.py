@@ -272,6 +272,48 @@ def get_batch(batch_id: str) -> dict:
     return data
 
 
+@router.get("/batch-evals/{batch_id}/evals")
+def get_batch_evals(batch_id: str) -> dict:
+    """Return all evals for a batch with their reports, plus aggregate metrics."""
+    try:
+        _store.get_batch(batch_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"batch {batch_id!r} not found")
+
+    evals = _store.list_evals_by_batch(batch_id)
+    rows = []
+    totals = {"benign_utility": 0.0, "utility_under_attack": 0.0, "targeted_asr": 0.0}
+    report_count = 0
+    for ev in evals:
+        row = {
+            "eval_id": ev["eval_id"],
+            "task_id": ev["task_id"],
+            "model": ev["model"],
+            "status": ev["status"],
+            "created_at": ev["created_at"],
+            "benign_utility": None,
+            "utility_under_attack": None,
+            "targeted_asr": None,
+            "injection_style": None,
+        }
+        try:
+            report = _store.get_report(ev["eval_id"])
+            row["benign_utility"] = report["benign_utility"]["value"]
+            row["utility_under_attack"] = report["utility_under_attack"]["value"]
+            row["targeted_asr"] = report["targeted_asr"]["value"]
+            row["injection_style"] = report.get("injection_style")
+            totals["benign_utility"] += row["benign_utility"]
+            totals["utility_under_attack"] += row["utility_under_attack"]
+            totals["targeted_asr"] += row["targeted_asr"]
+            report_count += 1
+        except KeyError:
+            pass
+        rows.append(row)
+
+    avg = {k: round(v / report_count, 3) if report_count else 0.0 for k, v in totals.items()}
+    return {"evals": rows, "summary": avg, "total": len(rows), "with_report": report_count}
+
+
 @router.delete("/batch-evals/{batch_id}", status_code=200)
 def cancel_batch(batch_id: str) -> dict:
     """Request cancellation of a running batch. Workers will stop after current tasks finish."""
@@ -536,7 +578,7 @@ def _run_batch_background(
                 tags=base_task.tags,
                 max_steps=base_task.max_steps,
             )
-            eval_record = _store.create_eval(task_id, model)
+            eval_record = _store.create_eval(task_id, model, batch_id=batch_id)
             eval_id = eval_record["eval_id"]
             _run_eval_background(eval_id, task_id, model, api_key, base_url, override_task=task)
             return True

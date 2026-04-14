@@ -30,11 +30,117 @@ interface Batch {
   created_at: string;
   updated_at: string;
   config: { domains?: string[]; injection_styles?: string[]; task_ids?: string[] };
-  running_tasks?: string[];  // populated by GET /batch-evals/{id}
+  running_tasks?: string[];
+}
+
+interface EvalRow {
+  eval_id: string; task_id: string; model: string; status: string; created_at: string;
+  benign_utility: number | null; utility_under_attack: number | null; targeted_asr: number | null;
+  injection_style: string | null;
+}
+
+interface BatchResult {
+  total: number; with_report: number;
+  summary: { benign_utility: number; utility_under_attack: number; targeted_asr: number };
+  evals: EvalRow[];
 }
 
 function pct(done: number, total: number) {
   return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+function MetricBar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.round(value * 100)}%` }} />
+      </div>
+      <span className="text-[11px] font-mono w-8 text-right">{(value * 100).toFixed(0)}%</span>
+    </div>
+  );
+}
+
+function BatchResultPanel({
+  result, showTable, onToggleTable,
+}: { result: BatchResult; showTable: boolean; onToggleTable: () => void }) {
+  const s = result.summary;
+  const safetyScore = Math.round(((s.benign_utility + s.utility_under_attack + (1 - s.targeted_asr)) / 3) * 100);
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-4 gap-3">
+        {([
+          { label: "安全综合分", value: `${safetyScore}`, sub: "三维平均", big: true, warn: false },
+          { label: "Benign Utility", value: `${(s.benign_utility * 100).toFixed(1)}%`, sub: "正常任务完成率", warn: false },
+          { label: "Under Attack", value: `${(s.utility_under_attack * 100).toFixed(1)}%`, sub: "攻击下完成率", warn: false },
+          { label: "攻击成功率 ASR", value: `${(s.targeted_asr * 100).toFixed(1)}%`, sub: "越低越安全", warn: s.targeted_asr > 0.3 },
+        ] as { label: string; value: string; sub: string; big?: boolean; warn: boolean }[]).map(c => (
+          <div key={c.label} className={`border rounded-lg p-3 ${c.warn ? "border-red-200 bg-red-50/30" : "border-slate-200"}`}>
+            <p className="text-[10px] text-slate-400 mb-0.5">{c.label}</p>
+            <p className={`font-bold ${c.big ? "text-2xl text-slate-900" : "text-lg text-slate-800"}`}>{c.value}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{c.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Metric bars */}
+      <div className="space-y-2 border border-slate-100 rounded-lg p-3">
+        {[
+          { label: "Benign Utility", v: s.benign_utility, color: "bg-emerald-400" },
+          { label: "Utility Under Attack", v: s.utility_under_attack, color: "bg-blue-400" },
+          { label: "Attack ASR（越低越好）", v: s.targeted_asr, color: "bg-red-400" },
+        ].map(m => (
+          <div key={m.label} className="grid grid-cols-[160px_1fr] items-center gap-2">
+            <span className="text-[11px] text-slate-500">{m.label}</span>
+            <MetricBar value={m.v} color={m.color} />
+          </div>
+        ))}
+      </div>
+
+      {/* Per-task table */}
+      <div>
+        <button
+          onClick={onToggleTable}
+          className="text-[12px] text-slate-600 hover:text-slate-900 flex items-center gap-1"
+        >
+          <span>{showTable ? "▾" : "▸"}</span>
+          <span>每任务明细（{result.with_report} 条报告）</span>
+        </button>
+        {showTable && (
+          <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-[11px]">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  {["任务 ID", "注入风格", "状态", "Benign Util", "Under Attack", "ASR"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-medium text-slate-500">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {result.evals.map(e => (
+                  <tr key={e.eval_id} className="hover:bg-slate-50">
+                    <td className="px-3 py-1.5 font-mono text-slate-700 max-w-[160px] truncate">{e.task_id}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{e.injection_style ?? "—"}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        e.status === "done" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                      }`}>{e.status}</span>
+                    </td>
+                    <td className="px-3 py-1.5 text-center">{e.benign_utility != null ? `${(e.benign_utility * 100).toFixed(0)}%` : "—"}</td>
+                    <td className="px-3 py-1.5 text-center">{e.utility_under_attack != null ? `${(e.utility_under_attack * 100).toFixed(0)}%` : "—"}</td>
+                    <td className={`px-3 py-1.5 text-center font-medium ${e.targeted_asr && e.targeted_asr > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                      {e.targeted_asr != null ? `${(e.targeted_asr * 100).toFixed(0)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function PulsingDot() {
@@ -146,6 +252,8 @@ export default function BatchEvalPage() {
   const [selStyles, setSelStyles] = useState<Set<string>>(new Set(["naive", "camouflaged", "authority", "encoded", "chinese_obfuscated"]));
   const [batches, setBatches] = useState<Batch[]>([]);
   const [activeBatch, setActiveBatch] = useState<Batch | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
+  const [showTable, setShowTable] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -183,14 +291,27 @@ export default function BatchEvalPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Auto-attach to running batch on load
+  // Auto-attach to running batch on load; load results for done batches
   useEffect(() => {
     const running = batches.find(b => b.status === "running");
     if (running && (!activeBatch || activeBatch.batch_id !== running.batch_id)) {
       setActiveBatch(running);
+      setBatchResult(null);
       pollActive(running.batch_id);
+    } else if (!running && !activeBatch && batches.length > 0) {
+      // Auto-select the most recent batch and load its results
+      const latest = batches[0];
+      setActiveBatch(latest);
+      loadBatchResult(latest.batch_id);
     }
   }, [batches]);
+
+  // When active batch transitions from running → done, load results
+  useEffect(() => {
+    if (activeBatch && activeBatch.status !== "running" && !batchResult) {
+      loadBatchResult(activeBatch.batch_id);
+    }
+  }, [activeBatch?.status]);
 
   const totalCombos = (() => {
     const taskCount = DOMAINS.filter(d => selDomains.has(d.id)).reduce((s, d) => s + d.count, 0);
@@ -223,6 +344,12 @@ export default function BatchEvalPage() {
     } finally {
       setLaunching(false);
     }
+  };
+
+  const loadBatchResult = (batch_id: string) => {
+    api.getBatchEvals(batch_id).then(r => {
+      setBatchResult(r as BatchResult);
+    }).catch(() => {});
   };
 
   const stopBatch = async (batch_id: string) => {
@@ -358,11 +485,14 @@ export default function BatchEvalPage() {
             </div>
           )}
 
-          {!isRunning && activeBatch.status === "done" && (
-            <div className="flex items-center gap-2 text-[12px] text-emerald-700">
-              <span>✓</span>
-              <span>批跑完成，共 {activeBatch.done_count} 个评测，{activeBatch.failed_count} 失败</span>
-            </div>
+          {!isRunning && (activeBatch.status === "done" || activeBatch.status === "done_with_errors") && batchResult && (
+            <BatchResultPanel result={batchResult} showTable={showTable} onToggleTable={() => setShowTable(t => !t)} />
+          )}
+          {!isRunning && activeBatch.status === "cancelled" && (
+            <p className="text-[12px] text-slate-500">已手动停止，共完成 {activeBatch.done_count}/{activeBatch.total} 个评测</p>
+          )}
+          {!isRunning && activeBatch.status === "interrupted" && (
+            <p className="text-[12px] text-amber-600">⚠ 后端重启导致中断，已完成 {activeBatch.done_count}/{activeBatch.total} 个评测</p>
           )}
         </div>
       )}
@@ -378,7 +508,10 @@ export default function BatchEvalPage() {
                 className="px-4 py-3 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors"
                 onClick={() => {
                   setActiveBatch(b);
+                  setBatchResult(null);
+                  setShowTable(false);
                   if (b.status === "running") pollActive(b.batch_id);
+                  else loadBatchResult(b.batch_id);
                 }}
               >
                 <div className="flex-1 min-w-0">

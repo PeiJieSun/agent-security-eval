@@ -257,6 +257,16 @@ export const api = {
   ),
   cancelBatch: (batch_id: string) =>
     req<{ batch_id: string; status: string }>(`/batch-evals/${batch_id}`, { method: "DELETE" }),
+  getBatchEvals: (batch_id: string) => req<{
+    total: number;
+    with_report: number;
+    summary: { benign_utility: number; utility_under_attack: number; targeted_asr: number };
+    evals: {
+      eval_id: string; task_id: string; model: string; status: string; created_at: string;
+      benign_utility: number | null; utility_under_attack: number | null; targeted_asr: number | null;
+      injection_style: string | null;
+    }[];
+  }>(`/batch-evals/${batch_id}/evals`),
 
   // M3-3: Release Gate
   getReleaseGate: (eval_id: string) =>
