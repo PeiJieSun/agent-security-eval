@@ -170,6 +170,23 @@ def get_metric_standards() -> list[dict]:
     return METRIC_STANDARDS
 
 
+# ── Evaluation Frameworks ─────────────────────────────────────────────────
+
+@router.get("/eval-frameworks")
+def get_eval_frameworks() -> list[dict]:
+    """Return all evaluation framework schemes with coverage mapping."""
+    from agent_eval.evaluation_frameworks import FRAMEWORKS
+    return FRAMEWORKS
+
+
+@router.get("/eval-frameworks/{framework_id}")
+def get_eval_framework(framework_id: str) -> dict:
+    from agent_eval.evaluation_frameworks import FRAMEWORKS_BY_ID
+    if framework_id not in FRAMEWORKS_BY_ID:
+        raise HTTPException(status_code=404, detail=f"Framework {framework_id!r} not found")
+    return FRAMEWORKS_BY_ID[framework_id]
+
+
 # ── Built-in tasks ────────────────────────────────────────────────────────
 
 @router.get("/tasks")

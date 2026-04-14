@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, type MetricStandard } from "../lib/api";
 import MetricBadge from "../components/MetricBadge";
 
@@ -73,6 +74,7 @@ function StandardCard({ std }: { std: MetricStandard }) {
 }
 
 export default function Standards() {
+  const navigate = useNavigate();
   const [standards, setStandards] = useState<MetricStandard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,17 +88,33 @@ export default function Standards() {
 
   return (
     <div className="px-8 py-7 max-w-3xl mx-auto">
-        <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">评测维度标准</h1>
-        <p className="text-[12px] text-slate-400 mb-6">
+        <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">指标定义</h1>
+        <p className="text-[12px] text-slate-400 mb-4">
           指标定义逐字引用自同行评审学术论文，确保评测结果可复现、可比较、可引用。
         </p>
+
+        {/* 跳转到方案页 */}
+        <div className="mb-5 flex items-center justify-between border border-slate-200 rounded-lg px-4 py-3 bg-slate-50">
+          <div>
+            <p className="text-[12px] font-medium text-slate-700">查看多套评测维度方案</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              OWASP LLM Top 10 · MITRE ATLAS · AgentDojo · 内部自有方案 v1 — 含覆盖率分析与维度映射
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/eval-frameworks")}
+            className="flex-shrink-0 px-3 py-1.5 border border-slate-300 rounded text-[11px] text-slate-700 hover:bg-white"
+          >
+            查看方案 →
+          </button>
+        </div>
 
         {/* 方法论说明 */}
         <div className="rounded-lg border border-slate-200 bg-white p-4 mb-6 text-[12px] text-slate-600 border-l-4 border-l-slate-400">
           <p>
-            <strong className="text-slate-700">框架来源：</strong>
-            AgentDojo（Debenedetti et al., NeurIPS 2024）的三维框架捕捉了任意 LLM Agent 的安全-效用权衡关系。
-            InjecAgent（Zhan et al., 2024）补充了 ASR-valid 指标，通过排除无效输出使攻击成功率的衡量更为精准。
+            <strong className="text-slate-700">指标来源：</strong>
+            以下四个指标来自 AgentDojo（Debenedetti et al., NeurIPS 2024）三维框架，
+            并由 InjecAgent（Zhan et al., 2024）补充 ASR-valid，通过排除无效输出使攻击成功率的衡量更为精准。
           </p>
           <p className="mt-1 text-slate-400">
             这两篇论文是目前学界评测 LLM Agent 安全性最广泛引用的基准。

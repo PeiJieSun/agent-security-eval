@@ -23,6 +23,7 @@ import MCPSecurityPage from "./pages/MCPSecurityPage";
 import BenchmarkComparePage from "./pages/BenchmarkComparePage";
 import DockerSandboxPage from "./pages/DockerSandboxPage";
 import AgentConnectorPage from "./pages/AgentConnectorPage";
+import EvalFrameworksPage from "./pages/EvalFrameworksPage";
 
 export default function App() {
   return (
@@ -73,6 +74,8 @@ export default function App() {
           <Route path="/sandbox" element={<DockerSandboxPage />} />
           {/* P1-1 */}
           <Route path="/agent-connector" element={<AgentConnectorPage />} />
+          {/* Eval Frameworks */}
+          <Route path="/eval-frameworks" element={<EvalFrameworksPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
