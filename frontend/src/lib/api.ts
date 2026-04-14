@@ -280,6 +280,31 @@ export const api = {
     req<{ task_id: string; snapshot_count: number; snapshots: { eval_id: string; created_at: string; benign_utility: number; targeted_asr: number; utility_under_attack: number; tool_dist: Record<string, number> }[]; drift_detected: boolean; drift_score: number; kl_divergence: number; asr_slope: number; utility_slope: number; summary: string }>(`/behavior-trend/${task_id}`),
   listBehaviorTasks: () => req<{ task_id: string; snapshot_count: number }[]>("/behavior-trend/tasks"),
 
+  // Agent Report (unified T1+T2+T3 scorecard)
+  getReportModels: () => fetch("/agent-report/models").then(r => r.json()) as Promise<string[]>,
+  getAgentReport: (model: string) =>
+    fetch(`/agent-report?model=${encodeURIComponent(model)}`).then(r => r.json()) as Promise<{
+      model: string;
+      overall: "pass" | "fail" | "not_run";
+      scored: number;
+      passed: number;
+      not_run: number;
+      source_batch: string | null;
+      dimensions: {
+        id: string;
+        name: string;
+        tier: string;
+        severity: string;
+        threshold: string;
+        description: string;
+        coverage: string[];
+        score: number | null;
+        status: "pass" | "fail" | "not_run";
+        source_type: string;
+        source_id: string | null;
+      }[];
+    }>,
+
   // Backend settings persistence
   getSettings: () => req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>("/settings"),
   updateSettings: (body: { api_key?: string; base_url?: string; model?: string }) =>

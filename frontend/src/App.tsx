@@ -24,6 +24,7 @@ import BenchmarkComparePage from "./pages/BenchmarkComparePage";
 import DockerSandboxPage from "./pages/DockerSandboxPage";
 import AgentConnectorPage from "./pages/AgentConnectorPage";
 import EvalFrameworksPage from "./pages/EvalFrameworksPage";
+import AgentReportPage from "./pages/AgentReportPage";
 
 export default function App() {
   return (
@@ -76,6 +77,8 @@ export default function App() {
           <Route path="/agent-connector" element={<AgentConnectorPage />} />
           {/* Eval Frameworks */}
           <Route path="/eval-frameworks" element={<EvalFrameworksPage />} />
+          {/* Unified Agent Report */}
+          <Route path="/report" element={<AgentReportPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

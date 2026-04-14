@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api, type Eval } from "../lib/api";
 import { hasApiKey } from "../lib/settings";
 
@@ -134,9 +134,9 @@ export default function Dashboard() {
           <h1 className="text-[15px] font-semibold text-slate-900">评测列表</h1>
           <p className="text-[12px] text-slate-400 mt-0.5">
             一类威胁 · 外部攻击防御 —&nbsp;
-            <a href="/standards" className="underline underline-offset-2 hover:text-slate-600">
+            <Link to="/standards" className="underline underline-offset-2 hover:text-slate-600">
               AgentDojo §3.4 + InjecAgent §2.3
-            </a>
+            </Link>
           </p>
         </div>
         <div className="flex items-center gap-2">
