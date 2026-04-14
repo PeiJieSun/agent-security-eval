@@ -117,23 +117,31 @@ class LLMAgentRunner:
             )
         return self._client
 
-    def run_clean(self, task: EvalTask) -> tuple[AgentTrajectory, EmailEnvironment]:
+    def run_clean(
+        self,
+        task: EvalTask,
+        step_callback: Optional[Any] = None,
+    ) -> tuple[AgentTrajectory, EmailEnvironment]:
         """Run agent against a clean (unattacked) environment."""
         env = _build_env(task)
         traj = AgentTrajectory(task_id=task.task_id)
         runtime = FunctionsRuntime(trajectory=traj)
         runtime.register_env(env, EMAIL_TOOLS)
-        self._agent_loop(task, runtime, traj, env)
+        self._agent_loop(task, runtime, traj, env, step_callback=step_callback, run_type="clean")
         return traj, env
 
-    def run_attacked(self, task: EvalTask) -> tuple[AgentTrajectory, EmailEnvironment]:
+    def run_attacked(
+        self,
+        task: EvalTask,
+        step_callback: Optional[Any] = None,
+    ) -> tuple[AgentTrajectory, EmailEnvironment]:
         """Run agent against an environment with the injection attack active."""
         env = _build_env(task)
         traj = AgentTrajectory(task_id=task.task_id)
         base_runtime = FunctionsRuntime()
         base_runtime.register_env(env, EMAIL_TOOLS)
         inj_runtime = InjectionRuntime(base_runtime, task.attack_vector, trajectory=traj)
-        self._agent_loop(task, inj_runtime, traj, env)
+        self._agent_loop(task, inj_runtime, traj, env, step_callback=step_callback, run_type="attack")
         return traj, env
 
     def _agent_loop(
@@ -142,6 +150,8 @@ class LLMAgentRunner:
         runtime: FunctionsRuntime | InjectionRuntime,
         traj: AgentTrajectory,
         env: EmailEnvironment,
+        step_callback: Optional[Any] = None,
+        run_type: str = "clean",
     ) -> None:
         import re
 
@@ -205,18 +215,34 @@ class LLMAgentRunner:
                     "content": obs_str,
                 })
 
+                # Emit real-time step event if a callback is registered
+                if step_callback is not None:
+                    try:
+                        step_callback({
+                            "step_k": len(traj.steps),
+                            "tool_name": fn_name,
+                            "tool_kwargs": fn_args,
+                            "observation": obs if isinstance(obs, dict) else {"result": obs},
+                            "reasoning": step_reasoning,
+                            "run_type": run_type,
+                        })
+                    except Exception:
+                        pass
+
     def eval_task(
         self,
         task: EvalTask,
         eval_id: Optional[str] = None,
+        **kwargs: Any,
     ) -> tuple["AgentTrajectory", "AgentTrajectory", Any]:
         """
         Run both clean + attacked runs and return trajectories.
         Score computation is handled by the caller (eval.py router).
         """
         eval_id = eval_id or ("eval_" + uuid.uuid4().hex[:8])
-        clean_traj, clean_env = self.run_clean(task)
-        attack_traj, attack_env = self.run_attacked(task)
+        step_cb = kwargs.get("step_callback")
+        clean_traj, clean_env = self.run_clean(task, step_callback=step_cb)
+        attack_traj, attack_env = self.run_attacked(task, step_callback=step_cb)
 
         benign_oracle = SuccessOracle(task.benign_success_expr)
         attack_oracle = SuccessOracle(task.attack_success_expr)

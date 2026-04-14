@@ -160,7 +160,7 @@ export default function Dashboard() {
           {evals.map((ev, i) => (
             <div
               key={ev.eval_id}
-              className={`grid grid-cols-[2fr_1fr_1fr_auto_auto_auto] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-rose-50/40 transition-colors ${
+              className={`grid grid-cols-[2fr_1fr_1fr_auto_auto_auto_auto] items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-rose-50/40 transition-colors ${
                 i < evals.length - 1 ? "border-b border-slate-100" : ""
               }`}
               onClick={() => navigate(`/evals/${ev.eval_id}`)}
@@ -170,6 +170,17 @@ export default function Dashboard() {
               <span className="text-[11px] font-mono text-slate-400 truncate">{ev.eval_id}</span>
               <EvalStatusBadge status={ev.status} />
               <span className="text-xs text-slate-400 whitespace-nowrap">{fmtDate(ev.created_at)}</span>
+              <button
+                className={`text-[10px] px-2 py-0.5 rounded font-mono transition-colors ${
+                  ev.status === "running"
+                    ? "bg-slate-900 text-green-400 hover:bg-slate-700 border border-slate-700"
+                    : "text-slate-300 hover:text-slate-500 border border-transparent"
+                }`}
+                onClick={(e) => { e.stopPropagation(); navigate(`/evals/${ev.eval_id}/monitor`); }}
+                title="实时监控"
+              >
+                {ev.status === "running" ? "🔴 监控" : "监控"}
+              </button>
               <button
                 className="text-slate-300 hover:text-rose-500 transition-colors text-sm w-6 text-center"
                 onClick={(e) => handleDelete(e, ev.eval_id)}

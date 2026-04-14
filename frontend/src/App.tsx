@@ -10,6 +10,7 @@ import ConsistencyPage from "./pages/ConsistencyPage";
 import EvalAwarenessPage from "./pages/EvalAwarenessPage";
 import CoTAuditPage from "./pages/CoTAuditPage";
 import BackdoorScanPage from "./pages/BackdoorScanPage";
+import LiveMonitorPage from "./pages/LiveMonitorPage";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/evals/new" element={<NewEval />} />
         <Route path="/evals/:eval_id" element={<EvalDetail />} />
+        <Route path="/evals/:eval_id/monitor" element={<LiveMonitorPage />} />
         {/* Second-type threat detection */}
         <Route path="/safety" element={<SafetyEvalList />} />
         <Route path="/safety/consistency" element={<ConsistencyPage />} />

@@ -180,9 +180,17 @@ export default function EvalDetail() {
               })()}
             </div>
           </div>
-          <a href="/standards" className="text-xs text-blue-600 hover:underline border border-blue-200 px-2 py-1 rounded">
-            评测标准 ↗
-          </a>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(`/evals/${eval_id}/monitor`)}
+              className="text-xs bg-slate-900 text-green-400 hover:bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg font-mono"
+            >
+              🔴 实时监控
+            </button>
+            <a href="/standards" className="text-xs text-blue-600 hover:underline border border-blue-200 px-2 py-1 rounded">
+              评测标准 ↗
+            </a>
+          </div>
         </div>
 
         {/* 运行中 */}

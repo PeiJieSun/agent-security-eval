@@ -22,19 +22,24 @@ GET  /api/v1/agent-eval/tasks
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agent_eval.api.settings import settings
+from agent_eval.monitor import MonitorEvent, RuntimeMonitor, format_sse
 from agent_eval.report import METRIC_STANDARDS, compute_report
 from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
 from agent_eval.storage.sqlite_store import SqliteStore
 from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
 
 import time
+
+_mon = RuntimeMonitor()
 
 router = APIRouter(prefix="/api/v1/agent-eval")
 _store = SqliteStore()
@@ -228,7 +233,80 @@ def get_report(eval_id: str) -> dict:
         )
 
 
+# ── Real-time SSE stream ───────────────────────────────────────────────────
+
+@router.get("/evals/{eval_id}/stream")
+async def stream_eval(eval_id: str, request: Request):
+    """
+    SSE endpoint — stream real-time tool-call events and OnlineJudge alerts
+    for a running eval.  Connect before or during the eval run.
+
+    Events:
+      tool_call_step  — each tool call the agent makes
+      policy_alert    — OnlineJudge fired a rule violation
+      eval_done       — eval completed (clean + attack)
+      eval_error      — eval failed
+    """
+    try:
+        _store.get_eval(eval_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"eval {eval_id!r} not found")
+
+    loop = asyncio.get_event_loop()
+    q = _mon.open(eval_id, loop)
+
+    async def event_generator():
+        try:
+            # Send initial heartbeat
+            yield f"event: connected\ndata: {{\"eval_id\": \"{eval_id}\"}}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event: MonitorEvent = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield format_sse(event)
+                    if event.event_type in ("eval_done", "eval_error"):
+                        break
+                except asyncio.TimeoutError:
+                    # Send keep-alive ping
+                    yield ": ping\n\n"
+        finally:
+            _mon.close(eval_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 # ── Background runner ─────────────────────────────────────────────────────
+
+def _make_step_callback(eval_id: str):
+    """Return a thread-safe callback that publishes step events + runs OnlineJudge."""
+    from agent_eval.monitor import EVENT_TYPES
+
+    def callback(step: dict):
+        judge = _mon.get_judge(eval_id)
+
+        # Publish the tool-call step event
+        _mon.publish_sync(eval_id, MonitorEvent(
+            event_type=EVENT_TYPES["step"],
+            eval_id=eval_id,
+            data=step,
+        ))
+
+        # Run online judge if available
+        if judge:
+            alerts = judge.inspect(step)
+            for alert_event in alerts:
+                _mon.publish_sync(eval_id, alert_event)
+
+    return callback
+
 
 def _run_eval_background(
     eval_id: str,
@@ -237,7 +315,9 @@ def _run_eval_background(
     api_key: str,
     base_url: str,
 ) -> None:
+    from agent_eval.monitor import EVENT_TYPES
     _store.update_eval(eval_id, status="running")
+    step_cb = _make_step_callback(eval_id)
     try:
         task = DEMO_TASKS_BY_ID[task_id]
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model,
@@ -245,7 +325,7 @@ def _run_eval_background(
         runner = LLMAgentRunner(cfg)
 
         clean_traj, attack_traj, (clean_result, attack_result) = runner.eval_task(
-            task, eval_id=eval_id
+            task, eval_id=eval_id, step_callback=step_cb
         )
 
         # Persist trajectories
@@ -264,5 +344,20 @@ def _run_eval_background(
         _store.save_report(eval_id, report.model_dump())
         _store.update_eval(eval_id, status="done")
 
+        _mon.publish_sync(eval_id, MonitorEvent(
+            event_type=EVENT_TYPES["done"],
+            eval_id=eval_id,
+            data={"eval_id": eval_id, "report_summary": {
+                "benign_utility": report.metrics.get("benign_utility", {}).get("value"),
+                "targeted_asr": report.metrics.get("targeted_asr", {}).get("value"),
+            }},
+        ))
+
     except Exception as exc:
+        from agent_eval.monitor import EVENT_TYPES as _ET
         _store.update_eval(eval_id, status="error", error=str(exc))
+        _mon.publish_sync(eval_id, MonitorEvent(
+            event_type=_ET["error"],
+            eval_id=eval_id,
+            data={"error": str(exc)},
+        ))
