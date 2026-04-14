@@ -11,6 +11,7 @@ import EvalAwarenessPage from "./pages/EvalAwarenessPage";
 import CoTAuditPage from "./pages/CoTAuditPage";
 import BackdoorScanPage from "./pages/BackdoorScanPage";
 import LiveMonitorPage from "./pages/LiveMonitorPage";
+import MemoryPoisonPage from "./pages/MemoryPoisonPage";
 
 export default function App() {
   return (
@@ -33,6 +34,8 @@ export default function App() {
         <Route path="/safety/cot-audit/:safety_id" element={<CoTAuditPage />} />
         <Route path="/safety/backdoor-scan" element={<BackdoorScanPage />} />
         <Route path="/safety/backdoor-scan/:safety_id" element={<BackdoorScanPage />} />
+        <Route path="/safety/memory-poison" element={<MemoryPoisonPage />} />
+        <Route path="/safety/memory-poison/:safety_id" element={<MemoryPoisonPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -15,10 +15,11 @@ function fmtDate(iso: string) {
 }
 
 const EVAL_TYPE_META: Record<string, { label: string; desc: string; icon: string; color: string; route: string }> = {
-  consistency:    { label: "一致性探测", desc: "M1-6 · 行为稳定性",     icon: "🔄", color: "bg-blue-50 border-blue-200 text-blue-700",   route: "/safety/consistency" },
-  eval_awareness: { label: "评测感知检测", desc: "M2-5 · 表演性对齐",   icon: "🎭", color: "bg-amber-50 border-amber-200 text-amber-700", route: "/safety/eval-awareness" },
-  cot_audit:      { label: "CoT 推理审计", desc: "M2-6 · 推理诚实性",   icon: "🔍", color: "bg-purple-50 border-purple-200 text-purple-700", route: "/safety/cot-audit" },
-  backdoor_scan:  { label: "后门触发扫描", desc: "M2-7 · 隐藏触发词",   icon: "🚨", color: "bg-rose-50 border-rose-200 text-rose-700",   route: "/safety/backdoor-scan" },
+  consistency:    { label: "一致性探测",    desc: "M1-6 · 行为稳定性",   icon: "🔄", color: "bg-blue-50 border-blue-200 text-blue-700",     route: "/safety/consistency" },
+  eval_awareness: { label: "评测感知检测",  desc: "M2-5 · 表演性对齐",   icon: "🎭", color: "bg-amber-50 border-amber-200 text-amber-700",   route: "/safety/eval-awareness" },
+  cot_audit:      { label: "CoT 推理审计",  desc: "M2-6 · 推理诚实性",   icon: "🔍", color: "bg-purple-50 border-purple-200 text-purple-700", route: "/safety/cot-audit" },
+  backdoor_scan:  { label: "后门触发扫描",  desc: "M2-7 · 隐藏触发词",   icon: "🚨", color: "bg-rose-50 border-rose-200 text-rose-700",     route: "/safety/backdoor-scan" },
+  memory_poison:  { label: "记忆投毒检测",  desc: "M2-1 · RAG 记忆污染", icon: "🧠", color: "bg-orange-50 border-orange-200 text-orange-700", route: "/safety/memory-poison" },
 };
 
 const STATUS_LABEL: Record<string, string> = { pending: "等待中", running: "运行中", done: "已完成", error: "出错" };
@@ -63,7 +64,7 @@ export default function SafetyEvalList() {
 
       <main className="mx-auto max-w-5xl px-6 py-8">
         {/* 4-type nav */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           {Object.entries(EVAL_TYPE_META).map(([type, meta]) => (
             <button
               key={type}

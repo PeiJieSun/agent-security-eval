@@ -296,6 +296,97 @@ def _run_backdoor_scan_bg(safety_id, task_id, trigger_ids, model, api_key, base_
         _store.update_safety_eval(safety_id, status="error", error=str(exc))
 
 
+# ── M2-1: Memory Poisoning ────────────────────────────────────────────────
+
+class MemoryPoisonRequest(BaseModel):
+    scenario_id: Optional[str] = None
+    task_id: str = "email-exfil"
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+@router.post("/memory-poison")
+def start_memory_poison(req: MemoryPoisonRequest, background: BackgroundTasks) -> dict:
+    """Start a memory poisoning evaluation (M2-1)."""
+    api_key = req.api_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key provided.")
+    model = req.model or settings.default_model
+    record = _store.create_safety_eval("memory_poison", req.task_id, model)
+    sid = record["safety_id"]
+    background.add_task(
+        _run_memory_poison_bg,
+        safety_id=sid,
+        scenario_id=req.scenario_id,
+        task_id=req.task_id,
+        model=model,
+        api_key=api_key,
+        base_url=req.base_url or settings.openai_base_url,
+    )
+    return record
+
+
+def _run_memory_poison_bg(safety_id, scenario_id, task_id, model, api_key, base_url):
+    import traceback
+    from agent_eval.memory_poison import SCENARIOS_BY_ID, BUILTIN_SCENARIOS, run_memory_poison
+    from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
+
+    _store.update_safety_eval(safety_id, status="running")
+    try:
+        from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
+        base_task = DEMO_TASKS_BY_ID.get(task_id) or list(DEMO_TASKS_BY_ID.values())[0]
+        scenarios = [SCENARIOS_BY_ID[scenario_id]] if scenario_id and scenario_id in SCENARIOS_BY_ID else BUILTIN_SCENARIOS
+        cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
+        runner = LLMAgentRunner(cfg)
+        results = [run_memory_poison(s, runner, base_task) for s in scenarios]
+
+        # Contamination curve
+        from itertools import groupby
+        asr_total = sum(1 for r in results if r.agent_took_malicious_action)
+        mean_asr = asr_total / len(results) if results else 0.0
+        curve = [
+            {"poison_rate": r.poison_rate, "success": r.agent_took_malicious_action}
+            for r in results
+        ]
+
+        _store.save_safety_result(safety_id, {
+            "task_id": task_id,
+            "model": model,
+            "scenarios": [
+                {
+                    "scenario_id": r.scenario_id,
+                    "poison_rate": r.poison_rate,
+                    "recalled_poisoned": r.recalled_poisoned,
+                    "agent_took_malicious_action": r.agent_took_malicious_action,
+                    "tool_sequence": r.tool_sequence,
+                    "error": r.error,
+                }
+                for r in results
+            ],
+            "mean_asr": mean_asr,
+            "contamination_curve": curve,
+        })
+        _store.update_safety_eval(safety_id, status="done")
+    except Exception as exc:
+        _store.update_safety_eval(safety_id, status="error", error=str(exc))
+
+
+@router.get("/memory-poison/scenarios")
+def list_memory_scenarios() -> list[dict]:
+    """List built-in memory poisoning scenarios."""
+    from agent_eval.memory_poison import BUILTIN_SCENARIOS
+    return [
+        {
+            "scenario_id": s.scenario_id,
+            "description": s.description,
+            "poison_rate": round(s.poison_rate, 3),
+            "poison_key": s.poison_key,
+        }
+        for s in BUILTIN_SCENARIOS
+    ]
+
+
 # ── Convenience: list consistency tasks ───────────────────────────────────
 
 @router.get("/consistency-tasks/list")
