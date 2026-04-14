@@ -124,6 +124,7 @@ export const api = {
   getRun: (run_id: string) => req<Run>(`/runs/${run_id}`),
   deleteRun: (run_id: string) => fetch(`${BASE}/runs/${run_id}`, { method: "DELETE" }),
   getTrajectory: (run_id: string) => req<TrajectoryDetail>(`/runs/${run_id}/trajectory`),
+  getTrajectoryDirect: (traj_id: string) => req<TrajectoryDetail>(`/trajectories/${traj_id}`),
   saveTrajectory: (run_id: string, trajectory_yaml: string) =>
     req<{ run_id: string; steps_count: number }>(`/runs/${run_id}/trajectory`, {
       method: "POST",

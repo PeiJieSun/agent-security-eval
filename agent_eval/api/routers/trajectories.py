@@ -148,3 +148,25 @@ def get_trajectory_by_run(
         "final_output": traj.final_output,
         "steps": traj.to_dict()["steps"],
     }
+
+
+@router.get("/trajectories/{traj_id}")
+def get_trajectory_direct(
+    traj_id: str,
+    store: SqliteStore = Depends(get_store),
+) -> dict[str, Any]:
+    """
+    Fetch a trajectory directly by its storage ID (no run record required).
+    Used for eval trajectories stored as {eval_id}_clean / {eval_id}_attack.
+    """
+    try:
+        traj = store.get_trajectory(traj_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Trajectory {traj_id!r} not found")
+    return {
+        "run_id": traj_id,
+        "task_id": traj.task_id,
+        "steps_count": len(traj.steps),
+        "final_output": traj.final_output,
+        "steps": traj.to_dict()["steps"],
+    }
