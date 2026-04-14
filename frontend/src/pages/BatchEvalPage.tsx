@@ -3,6 +3,7 @@
  * Runs all tasks × injection styles concurrently (4 workers) and streams progress.
  */
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
 
@@ -88,6 +89,7 @@ function BatchResultPanel({
   onToggleTable: () => void;
   onRerun: () => void;
 }) {
+  const navigate = useNavigate();
   const s = result.summary;
   const safetyScore = Math.round(((s.benign_utility + s.utility_under_attack + (1 - s.targeted_asr)) / 3) * 100);
   const cfg = batch.config;
@@ -149,6 +151,25 @@ function BatchResultPanel({
             <MetricBar value={m.v} color={m.color} />
           </div>
         ))}
+      </div>
+
+      {/* Bridge to full report */}
+      <div className="flex items-center justify-between border border-slate-200 rounded-lg px-4 py-3 bg-slate-50/60">
+        <div className="min-w-0">
+          <p className="text-[12px] font-medium text-slate-700">
+            当前为一类威胁快照（AgentDojo 三维）
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            完整系统评价含二类威胁（诚实性）、三类威胁（基础设施）及 OWASP / 内部方案 v1 十二维对应
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/report?model=${encodeURIComponent(batch.model)}`)}
+          className="ml-4 shrink-0 text-[12px] px-3 py-1.5 rounded border border-slate-400 text-slate-700
+                     hover:bg-slate-100 transition-colors whitespace-nowrap font-medium"
+        >
+          查看系统安全报告 →
+        </button>
       </div>
 
       {/* Per-task detail table */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { PageHeader } from "../components/AppShell";
 
@@ -82,29 +82,43 @@ function OverallBadge({ status, scored, passed, not_run }: Pick<ReportData, "ove
   );
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  batch:      "批量评测",
+  safety:     "安全评测",
+  sandbox:    "Docker 沙箱",
+  tool_graph: "工具调用图",
+};
+
 function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => void }) {
   const scoreStr = dim.score !== null ? `${(dim.score * 100).toFixed(1)}%` : "—";
   const jumpPath = DIM_JUMP[dim.id];
+  const sourceLabel = SOURCE_LABEL[dim.source_type] ?? dim.source_type;
+  const sourceId = dim.source_id ? dim.source_id.slice(0, 10) + "…" : null;
+
   return (
     <tr className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
       <td className="py-2 px-3">
         <div className="text-[13px] text-slate-200">{dim.name}</div>
         <div className="text-[10px] text-slate-600 mt-0.5">{dim.description}</div>
       </td>
-      <td className="py-2 px-3 text-[11px] text-slate-500">{dim.tier}</td>
+      <td className="py-2 px-3 text-[11px] text-slate-500 whitespace-nowrap">{dim.tier}</td>
       <td className={`py-2 px-3 text-[11px] ${SEVERITY_COLOR[dim.severity] || "text-slate-400"}`}>{dim.severity}</td>
-      <td className="py-2 px-3 text-[11px] text-slate-400 font-mono">{dim.threshold}</td>
+      <td className="py-2 px-3 text-[11px] text-slate-400 font-mono whitespace-nowrap">{dim.threshold}</td>
       <td className="py-2 px-3 text-[13px] font-mono text-slate-300 tabular-nums">{scoreStr}</td>
       <td className="py-2 px-3"><StatusBadge status={dim.status} /></td>
       <td className="py-2 px-3">
-        {dim.status === "not_run" && jumpPath && (
+        {dim.status !== "not_run" && sourceId ? (
+          <span className="text-[10px] text-slate-600 font-mono" title={dim.source_id ?? ""}>
+            {sourceLabel}<br />{sourceId}
+          </span>
+        ) : jumpPath ? (
           <button
             onClick={() => onJump(jumpPath)}
-            className="text-[11px] text-sky-500 hover:text-sky-300 underline underline-offset-2"
+            className="text-[11px] text-sky-500 hover:text-sky-300 underline underline-offset-2 whitespace-nowrap"
           >
-            去运行
+            去运行 →
           </button>
-        )}
+        ) : null}
       </td>
     </tr>
   );
@@ -112,8 +126,9 @@ function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => voi
 
 export default function AgentReportPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [models, setModels] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>(searchParams.get("model") ?? "");
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,8 +136,15 @@ export default function AgentReportPage() {
   useEffect(() => {
     api.getReportModels().then((ms) => {
       setModels(ms);
-      if (ms.length > 0) setSelectedModel(ms[0]);
+      // Pre-select from URL param, fallback to first available
+      const urlModel = searchParams.get("model");
+      if (urlModel && ms.includes(urlModel)) {
+        setSelectedModel(urlModel);
+      } else if (!selectedModel && ms.length > 0) {
+        setSelectedModel(ms[0]);
+      }
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -149,6 +171,31 @@ export default function AgentReportPage() {
         title="安全报告"
         subtitle="内部方案 v1 — 一/二/三类威胁十二维综合评分卡"
       />
+
+      {/* Framework provenance legend */}
+      <div className="mb-5 border border-white/[0.06] rounded-lg p-3 grid grid-cols-3 gap-3 text-[11px]">
+        <div>
+          <span className="text-slate-500 font-semibold">一类威胁（T1）</span>
+          <p className="text-slate-600 mt-0.5 leading-relaxed">
+            外部 IPI 攻击防御 — 数据来自<strong className="text-slate-500">批量评测</strong>，
+            基于 <span className="font-mono">AgentDojo §3.1</span> + <span className="font-mono">InjecAgent §4</span> 三维框架。
+          </p>
+        </div>
+        <div>
+          <span className="text-slate-500 font-semibold">二类威胁（T2）</span>
+          <p className="text-slate-600 mt-0.5 leading-relaxed">
+            Agent 诚实性检测 — 数据来自<strong className="text-slate-500">安全评测</strong>（一致性探测、CoT 审计、评测感知、后门扫描），
+            参考 PromptBench / Lanham et al. / Greenblatt et al.
+          </p>
+        </div>
+        <div>
+          <span className="text-slate-500 font-semibold">三类威胁（T3）</span>
+          <p className="text-slate-600 mt-0.5 leading-relaxed">
+            基础设施安全 — 数据来自 <strong className="text-slate-500">MCP 安全评测 / 记忆投毒 / Docker 沙箱</strong>，
+            对应 OWASP LLM Top 10 (2025) 相关条目。
+          </p>
+        </div>
+      </div>
 
       {/* Model selector + export */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
@@ -253,7 +300,7 @@ export default function AgentReportPage() {
                         <th className="py-2 px-3 text-left text-[10px] font-medium text-slate-600 uppercase tracking-wider">阈值</th>
                         <th className="py-2 px-3 text-left text-[10px] font-medium text-slate-600 uppercase tracking-wider">得分</th>
                         <th className="py-2 px-3 text-left text-[10px] font-medium text-slate-600 uppercase tracking-wider">结论</th>
-                        <th className="py-2 px-3 text-left text-[10px] font-medium text-slate-600 uppercase tracking-wider"></th>
+                        <th className="py-2 px-3 text-left text-[10px] font-medium text-slate-600 uppercase tracking-wider">数据来源</th>
                       </tr>
                     </thead>
                     <tbody>
