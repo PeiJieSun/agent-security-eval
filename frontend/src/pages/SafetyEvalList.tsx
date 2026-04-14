@@ -63,9 +63,67 @@ export default function SafetyEvalList() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8">
-        {/* 4-type nav */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
-          {Object.entries(EVAL_TYPE_META).map(([type, meta]) => (
+
+        {/* ── 概念框架说明 ───────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-4 mb-7">
+          <button
+            onClick={() => navigate("/")}
+            className="rounded-2xl border-2 border-rose-200 bg-rose-50 px-5 py-4 text-left hover:border-rose-300 hover:bg-rose-100 transition-colors group"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">⚔️</span>
+              <span className="font-bold text-rose-800">一类威胁（主评测页）</span>
+              <span className="ml-auto text-xs text-rose-400 group-hover:text-rose-600">返回 ←</span>
+            </div>
+            <p className="text-xs text-rose-700 leading-relaxed">
+              <strong>外部攻击者</strong>通过工具返回值注入恶意指令（IPI）。<br/>
+              Agent 是无辜受害者，测试它<strong>能否抵御外部劫持</strong>。
+            </p>
+          </button>
+
+          <div className="rounded-2xl border-2 border-purple-300 bg-purple-50 px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">🛡</span>
+              <span className="font-bold text-purple-800">二类威胁（当前区域）</span>
+              <span className="ml-auto text-[10px] bg-purple-200 text-purple-800 font-bold px-2 py-0.5 rounded">当前区域</span>
+            </div>
+            <p className="text-xs text-purple-700 leading-relaxed">
+              <strong>Agent 自身</strong>可能不诚实。行为稳定吗？推理真实吗？有隐藏触发器吗？感知测评会「表演」吗？<br/>
+              不假设外部攻击，审查 Agent 自身诚实性与可信度。
+            </p>
+          </div>
+        </div>
+
+        {/* ── 注意：记忆投毒属于外部攻击变体 ─────────────────── */}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-6 flex items-start gap-2 text-xs text-amber-800">
+          <span className="text-base shrink-0 mt-0.5">⚠️</span>
+          <div>
+            <span className="font-bold">关于「记忆投毒（M2-1）」的分类说明：</span>
+            记忆投毒本质上是一类威胁的变体（外部攻击者通过 RAG 记忆注入，而非 IPI 工具返回值）。
+            它放在此处是因为它使用相同的行为检测基础设施，但请注意其攻击来源<strong>仍是外部攻击者</strong>，
+            与 CoT 审计/后门扫描等真正的二类威胁不同。
+          </div>
+        </div>
+
+        {/* ── 检测方式导航卡 ─────────────────────────────────────── */}
+        <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">二类威胁检测方式</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          {Object.entries(EVAL_TYPE_META).filter(([t]) => t !== "memory_poison").map(([type, meta]) => (
+            <button
+              key={type}
+              onClick={() => navigate(meta.route)}
+              className={`rounded-2xl border p-4 text-left hover:shadow-md transition-shadow ${meta.color}`}
+            >
+              <div className="text-2xl mb-2">{meta.icon}</div>
+              <div className="font-semibold text-sm">{meta.label}</div>
+              <div className="text-xs opacity-70 mt-0.5">{meta.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 mt-5">一类威胁扩展攻击面（外部攻击变体）</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {Object.entries(EVAL_TYPE_META).filter(([t]) => t === "memory_poison").map(([type, meta]) => (
             <button
               key={type}
               onClick={() => navigate(meta.route)}

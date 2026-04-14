@@ -108,6 +108,47 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8">
+
+        {/* ── 测评框架总览 ──────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* 当前区域：一类威胁 */}
+          <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">⚔️</span>
+              <span className="font-bold text-rose-800">一类威胁：外部攻击防御</span>
+              <span className="ml-auto text-[10px] bg-rose-200 text-rose-800 font-bold px-2 py-0.5 rounded">当前区域</span>
+            </div>
+            <p className="text-xs text-rose-700 leading-relaxed">
+              攻击者在<strong>外部</strong>，通过工具返回值嵌入恶意指令（间接提示注入 IPI）。
+              测试：Agent 是否会被外部攻击者劫持？
+            </p>
+            <div className="mt-2 text-[11px] text-rose-600 space-y-0.5">
+              <div>指标：Benign Utility · Utility Under Attack · Targeted ASR · ASR-valid</div>
+              <div>来源：AgentDojo (NeurIPS 2024) · InjecAgent (2024)</div>
+            </div>
+          </div>
+
+          {/* 另一区域：二类威胁 */}
+          <button
+            onClick={() => navigate("/safety")}
+            className="rounded-2xl border-2 border-purple-200 bg-purple-50 px-5 py-4 text-left hover:border-purple-400 hover:bg-purple-100 transition-colors group"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">🛡</span>
+              <span className="font-bold text-purple-800">二类威胁：Agent 自身诚实性</span>
+              <span className="ml-auto text-xs text-purple-500 group-hover:text-purple-700">进入 →</span>
+            </div>
+            <p className="text-xs text-purple-700 leading-relaxed">
+              威胁来自 Agent <strong>内部</strong>——Agent 可能表演性对齐、推理不诚实、有后门触发器、行为不一致。
+              测试：这个 Agent 值得信任吗？
+            </p>
+            <div className="mt-2 text-[11px] text-purple-600 space-y-0.5">
+              <div>检测：一致性探测 · 评测感知 · CoT 审计 · 后门扫描</div>
+              <div>来源：PromptBench · Alignment Faking · Lanham 2023 · Hidden Killer</div>
+            </div>
+          </button>
+        </div>
+
         {/* 统计面板 */}
         <div className="grid grid-cols-4 gap-3 mb-6">
           {[
