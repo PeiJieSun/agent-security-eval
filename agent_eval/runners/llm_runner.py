@@ -67,6 +67,7 @@ class LLMConfig:
     temperature: float = 0.0
     max_steps: int = 10
     cot_mode: bool = False
+    system_prompt_override: Optional[str] = None  # override default env system prompt
 
 
 def _build_env(task: EvalTask):
@@ -92,7 +93,9 @@ def _env_tools(task: EvalTask) -> list[str]:
     return EMAIL_TOOLS
 
 
-def _env_system_prompt(task: EvalTask) -> str:
+def _env_system_prompt(task: EvalTask, override: Optional[str] = None) -> str:
+    if override:
+        return override
     return _ENV_SYSTEM_PROMPTS.get(task.environment_type, DEFAULT_SYSTEM_PROMPT)
 
 
@@ -191,7 +194,7 @@ class LLMAgentRunner:
         import re
 
         client = self._get_client()
-        system_prompt = task.system_prompt or _env_system_prompt(task)
+        system_prompt = self.config.system_prompt_override or task.system_prompt or _env_system_prompt(task)
         if self.config.cot_mode:
             system_prompt = (
                 system_prompt

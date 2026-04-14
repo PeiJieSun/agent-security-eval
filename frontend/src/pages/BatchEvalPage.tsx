@@ -308,6 +308,10 @@ export default function BatchEvalPage() {
   const [launching, setLaunching] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [customEndpoint, setCustomEndpoint] = useState("");
+  const [customApiKey, setCustomApiKey] = useState("");
+  const [systemPromptOverride, setSystemPromptOverride] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll list every 5s
@@ -380,13 +384,15 @@ export default function BatchEvalPage() {
     setError(null);
     setLaunching(true);
     try {
-      const b = await api.createBatch({
+      const body: Record<string, unknown> = {
         domains: [...selDomains],
         injection_styles: [...selStyles],
         model: profile?.model,
-        api_key: profile?.apiKey,
-        base_url: profile?.baseUrl || undefined,
-      }) as Batch;
+        api_key: customApiKey || profile?.apiKey,
+        base_url: customEndpoint || profile?.baseUrl || undefined,
+      };
+      if (systemPromptOverride.trim()) body.system_prompt_override = systemPromptOverride.trim();
+      const b = await api.createBatch(body) as Batch;
       setActiveBatch(b);
       loadBatches();
       pollActive(b.batch_id);
@@ -431,7 +437,42 @@ export default function BatchEvalPage() {
 
       {/* Config panel */}
       <div className="border border-slate-200 rounded-lg p-5 space-y-4">
-        <p className="text-[12px] font-medium text-slate-700">评测范围配置</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[12px] font-medium text-slate-700">评测范围配置</p>
+          {/* Quick-select presets from standard_v1.yaml */}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => {
+                setSelDomains(new Set(["email"]));
+                setSelStyles(new Set(["naive"]));
+              }}
+              className="px-2 py-1 text-[10px] border border-slate-200 rounded hover:bg-slate-50 text-slate-500"
+              title="P0 Smoke — email × naive，最快验证"
+            >
+              P0 Smoke
+            </button>
+            <button
+              onClick={() => {
+                setSelDomains(new Set(["email", "research", "chinese"]));
+                setSelStyles(new Set(["naive", "camouflaged"]));
+              }}
+              className="px-2 py-1 text-[10px] border border-slate-200 rounded hover:bg-slate-50 text-slate-500"
+              title="三域 × 2风格 快速版"
+            >
+              快速版
+            </button>
+            <button
+              onClick={() => {
+                setSelDomains(new Set(["email", "research", "chinese"]));
+                setSelStyles(new Set(["naive", "camouflaged", "authority", "encoded", "chinese_obfuscated"]));
+              }}
+              className="px-2 py-1 text-[10px] border border-slate-800 rounded bg-slate-800 text-white"
+              title="standard_v1 全量：21 任务 × 5 风格"
+            >
+              标准套件 v1
+            </button>
+          </div>
+        </div>
 
         <div className="space-y-1.5">
           <p className="text-[11px] text-slate-400 uppercase tracking-wide">任务域</p>
@@ -471,10 +512,59 @@ export default function BatchEvalPage() {
           </div>
         </div>
 
+        {/* Advanced / Custom Agent */}
+        <div className="border-t border-slate-100 pt-3 space-y-2">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-1"
+          >
+            <span>{showAdvanced ? "▼" : "▶"}</span>
+            <span>高级 / 接入内部 Agent</span>
+          </button>
+          {showAdvanced && (
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">自定义 Base URL</label>
+                  <input
+                    type="text"
+                    value={customEndpoint}
+                    onChange={e => setCustomEndpoint(e.target.value)}
+                    placeholder={profile?.baseUrl || "https://api.openai.com/v1"}
+                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-0.5">留空则使用当前激活配置</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">自定义 API Key</label>
+                  <input
+                    type="password"
+                    value={customApiKey}
+                    onChange={e => setCustomApiKey(e.target.value)}
+                    placeholder="留空则使用当前激活配置"
+                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-1">系统提示词覆盖（可选）</label>
+                <textarea
+                  value={systemPromptOverride}
+                  onChange={e => setSystemPromptOverride(e.target.value)}
+                  rows={2}
+                  placeholder="留空则使用框架默认环境提示词"
+                  className="w-full border border-slate-200 rounded px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-slate-400 resize-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-between pt-1 border-t border-slate-100">
           <div className="text-[12px] text-slate-500">
             共 <span className="font-semibold text-slate-800">{totalCombos}</span> 个组合
             {profile && <span className="ml-2 text-slate-400">· {profile.model}</span>}
+            {customEndpoint && <span className="ml-2 text-blue-500 text-[10px]">→ {customEndpoint}</span>}
           </div>
           <button
             onClick={launch}

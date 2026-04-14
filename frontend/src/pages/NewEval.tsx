@@ -98,19 +98,24 @@ const DOMAIN_FILTERS = [
   { id: "chinese", label: "🇨🇳 中文专项" },
 ];
 
+// Mode: "standard" = use saved profile; "custom" = custom agent endpoint
+type EvalMode = "standard" | "custom";
+
 export default function NewEval() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<EvalMode>("standard");
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [selectedTask, setSelectedTask] = useState("");
   const [domainFilter, setDomainFilter] = useState("all");
   const [model, setModel] = useState("gpt-4o-mini");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load saved settings
     const s = loadSettings();
     if (s.model) setModel(s.model);
     if (s.apiKey) setApiKey(s.apiKey);
@@ -128,12 +133,19 @@ export default function NewEval() {
     setSubmitting(true);
     setError(null);
     try {
-      const body: { task_id: string; model?: string; api_key?: string; base_url?: string } = {
+      const body: {
+        task_id: string;
+        model?: string;
+        api_key?: string;
+        base_url?: string;
+        system_prompt_override?: string;
+      } = {
         task_id: selectedTask,
         model: model || undefined,
       };
       if (apiKey) body.api_key = apiKey;
       if (baseUrl) body.base_url = baseUrl;
+      if (systemPrompt.trim()) body.system_prompt_override = systemPrompt.trim();
       const evalRecord = await api.createEval(body);
       navigate(`/evals/${evalRecord.eval_id}`);
     } catch (err: unknown) {
@@ -151,13 +163,49 @@ export default function NewEval() {
   return (
     <div className="px-8 py-7 max-w-2xl mx-auto">
         <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">新建评测</h1>
-        <p className="text-[12px] text-slate-400 mb-6">
+        <p className="text-[12px] text-slate-400 mb-4">
           对 LLM Agent 发起真实安全评测：正常运行 + 注入攻击各跑一次，输出{" "}
           <a href="/standards" className="underline underline-offset-2 hover:text-slate-600">4 维安全指标</a>。
         </p>
 
-        {/* Settings shortcut */}
-        {!hasApiKey() && (
+        {/* Mode switcher */}
+        <div className="mb-5 flex gap-2">
+          {([
+            { id: "standard", label: "使用模型配置", desc: "从设置中的 LLM 配置启动" },
+            { id: "custom",   label: "接入内部 Agent", desc: "任意 OpenAI 兼容 endpoint" },
+          ] as { id: EvalMode; label: string; desc: string }[]).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setMode(m.id)}
+              className={`flex-1 border rounded-lg px-4 py-2.5 text-left transition-colors ${
+                mode === m.id
+                  ? "border-slate-700 bg-slate-900 text-white"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <div className="text-[12px] font-semibold">{m.label}</div>
+              <div className={`text-[10px] mt-0.5 ${mode === m.id ? "text-slate-300" : "text-slate-400"}`}>{m.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Custom agent quick guide */}
+        {mode === "custom" && (
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[12px] text-slate-600 space-y-1">
+            <p className="font-semibold text-slate-700 mb-1.5">接入要求</p>
+            <p>✓ 提供 OpenAI 兼容的 Chat Completions 接口（<code className="bg-white px-1 rounded">/v1/chat/completions</code>）</p>
+            <p>✓ 支持 <code className="bg-white px-1 rounded">function_calling</code>（工具调用）</p>
+            <p>✓ 填写 base_url + api_key + model 即可，无需修改 agent 代码</p>
+            <p className="text-slate-400 pt-1">
+              框架会使用标准任务集向你的 agent 发送任务、执行工具调用、记录轨迹、计算安全指标。
+              <button onClick={() => navigate("/agent-connector")} className="ml-1 text-slate-600 underline underline-offset-2">查看详细接入指南 →</button>
+            </p>
+          </div>
+        )}
+
+        {/* Settings shortcut (standard mode) */}
+        {mode === "standard" && !hasApiKey() && (
           <div className="mb-5 border border-slate-200 rounded-lg p-3 text-sm text-slate-600 flex items-center gap-3">
             <span className="flex-1">⚠ 未配置 API Key，请先前往设置页面或在下方填写。</span>
             <button
@@ -241,25 +289,29 @@ export default function NewEval() {
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700">LLM 配置</h3>
-                {getActiveProfile() && (
+                <h3 className="text-sm font-semibold text-gray-700">
+                  {mode === "custom" ? "Agent Endpoint 配置" : "LLM 配置"}
+                </h3>
+                {mode === "standard" && getActiveProfile() && (
                   <p className="text-xs text-gray-400 mt-0.5">
                     使用配置：<span className="font-medium text-gray-600">{getActiveProfile()!.name}</span>
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => navigate("/settings")}
-                className="text-xs text-rose-600 hover:underline"
-              >
-                管理配置 →
-              </button>
+              {mode === "standard" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/settings")}
+                  className="text-xs text-rose-600 hover:underline"
+                >
+                  管理配置 →
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">模型</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">模型名称</label>
                 <input
                   type="text"
                   value={model}
@@ -276,7 +328,7 @@ export default function NewEval() {
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-… （已保存则留空）"
+                  placeholder={mode === "custom" ? "你的 agent API key" : "sk-… （已保存则留空）"}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-400"
                 />
               </div>
@@ -285,15 +337,43 @@ export default function NewEval() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 Base URL
-                <span className="font-normal text-gray-400 ml-1">（可选，本地 vLLM 等）</span>
+                {mode === "standard" && <span className="font-normal text-gray-400 ml-1">（可选，本地 vLLM 等）</span>}
+                {mode === "custom" && <span className="font-normal text-red-400 ml-1">（必填，指向你的 agent 地址）</span>}
               </label>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.openai.com/v1"
+                placeholder={mode === "custom" ? "http://your-agent-host:8080/v1" : "https://api.openai.com/v1"}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
+            </div>
+
+            {/* System prompt override */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              >
+                <span>{showSystemPrompt ? "▼" : "▶"}</span>
+                <span>系统提示词覆盖</span>
+                <span className="text-gray-400 ml-1">（可选）</span>
+              </button>
+              {showSystemPrompt && (
+                <div className="mt-2">
+                  <p className="text-[10px] text-gray-400 mb-1.5">
+                    若填写，框架将使用此系统提示词替代默认的环境提示词，可用于测试带有自定义指令的 agent。
+                  </p>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={4}
+                    placeholder="You are a helpful assistant. Use the tools to complete tasks..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

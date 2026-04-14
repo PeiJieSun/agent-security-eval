@@ -72,6 +72,7 @@ class CreateEvalRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+    system_prompt_override: Optional[str] = None  # custom agent system prompt
 
 
 class CreateBatchRequest(BaseModel):
@@ -81,6 +82,7 @@ class CreateBatchRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+    system_prompt_override: Optional[str] = None  # custom agent system prompt
 
 
 class TestConnectionRequest(BaseModel):
@@ -408,6 +410,7 @@ def create_batch(req: CreateBatchRequest) -> dict:
             model=model,
             api_key=api_key,
             base_url=base_url,
+            system_prompt_override=req.system_prompt_override,
         ),
         daemon=True,
     )
@@ -445,6 +448,7 @@ def create_eval(req: CreateEvalRequest, background_tasks: BackgroundTasks) -> di
         model=model,
         api_key=api_key,
         base_url=req.base_url or settings.openai_base_url,
+        system_prompt_override=req.system_prompt_override,
     )
 
     return eval_record
@@ -551,6 +555,7 @@ def _run_batch_background(
     model: str,
     api_key: str,
     base_url: str,
+    system_prompt_override: Optional[str] = None,
 ) -> None:
     """Run all (task, style) combos with up to _BATCH_CONCURRENCY parallel workers."""
     from agent_eval.task_spec import EvalTask, InjectionStyle, InjectionVector
@@ -596,7 +601,9 @@ def _run_batch_background(
             )
             eval_record = _store.create_eval(task_id, model, batch_id=batch_id)
             eval_id = eval_record["eval_id"]
-            _run_eval_background(eval_id, task_id, model, api_key, base_url, override_task=task)
+            _run_eval_background(eval_id, task_id, model, api_key, base_url,
+                                 override_task=task,
+                                 system_prompt_override=system_prompt_override)
             return True
         except Exception:
             return False
@@ -637,6 +644,7 @@ def _run_eval_background(
     api_key: str,
     base_url: str,
     override_task=None,
+    system_prompt_override: Optional[str] = None,
 ) -> None:
     from agent_eval.monitor import EVENT_TYPES
     _store.update_eval(eval_id, status="running")
@@ -644,7 +652,8 @@ def _run_eval_background(
     try:
         task = override_task if override_task is not None else DEMO_TASKS_BY_ID[task_id]
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model,
-                        max_steps=task.max_steps)
+                        max_steps=task.max_steps,
+                        system_prompt_override=system_prompt_override)
         runner = LLMAgentRunner(cfg)
 
         clean_traj, attack_traj, (clean_result, attack_result) = runner.eval_task(

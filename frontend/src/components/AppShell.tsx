@@ -66,7 +66,8 @@ const NAV: NavSection[] = [
     heading: "开放世界评测",
     badge: "任意 Agent",
     items: [
-      { label: "Docker 沙箱", path: "/sandbox", desc: "隔离容器中运行任意 agent 框架评测" },
+      { label: "Docker 沙箱",     path: "/sandbox",          desc: "隔离容器中运行任意 agent 框架评测" },
+      { label: "接入内部 Agent",  path: "/agent-connector",  desc: "任意 OpenAI 兼容 endpoint 快速接入" },
     ],
   },
 ];
