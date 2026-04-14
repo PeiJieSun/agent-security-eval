@@ -61,6 +61,8 @@ _store = SqliteStore()
 # In-memory running-task tracker: batch_id → set of "task_id:style" strings
 _batch_running: dict[str, set[str]] = {}
 _batch_lock = threading.Lock()
+# Cancellation flags: batch_id → threading.Event (set = cancel requested)
+_batch_cancel: dict[str, threading.Event] = {}
 
 
 # ── Request / Response schemas ────────────────────────────────────────────
@@ -270,6 +272,24 @@ def get_batch(batch_id: str) -> dict:
     return data
 
 
+@router.delete("/batch-evals/{batch_id}", status_code=200)
+def cancel_batch(batch_id: str) -> dict:
+    """Request cancellation of a running batch. Workers will stop after current tasks finish."""
+    try:
+        data = _store.get_batch(batch_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"batch {batch_id!r} not found")
+    if data["status"] != "running":
+        raise HTTPException(status_code=400, detail="批次已结束，无法取消")
+    # Signal the worker thread to stop
+    with _batch_lock:
+        ev = _batch_cancel.get(batch_id)
+        if ev:
+            ev.set()
+    _store.update_batch(batch_id, status="cancelled")
+    return {"batch_id": batch_id, "status": "cancelled"}
+
+
 @router.post("/batch-evals", status_code=202)
 def create_batch(req: CreateBatchRequest) -> dict:
     """
@@ -477,15 +497,19 @@ def _run_batch_background(
     """Run all (task, style) combos with up to _BATCH_CONCURRENCY parallel workers."""
     from agent_eval.task_spec import EvalTask, InjectionStyle, InjectionVector
 
-    # Register running set
+    # Register running set + cancel flag
+    cancel_event = threading.Event()
     with _batch_lock:
         _batch_running[batch_id] = set()
+        _batch_cancel[batch_id] = cancel_event
 
     done_count = 0
     failed_count = 0
     lock = threading.Lock()
 
     def _run_one(task_id: str, style_value: str) -> bool:
+        if cancel_event.is_set():
+            return False
         slot = f"{task_id}:{style_value}"
         with _batch_lock:
             _batch_running[batch_id].add(slot)
@@ -536,7 +560,15 @@ def _run_batch_background(
 
     with _batch_lock:
         _batch_running.pop(batch_id, None)
-    final_status = "done" if failed_count == 0 else ("failed" if done_count == 0 else "done_with_errors")
+        _batch_cancel.pop(batch_id, None)
+    if cancel_event.is_set():
+        final_status = "cancelled"
+    elif failed_count == 0:
+        final_status = "done"
+    elif done_count == 0:
+        final_status = "failed"
+    else:
+        final_status = "done_with_errors"
     _store.update_batch(batch_id, status=final_status, done_count=done_count, failed_count=failed_count)
 
 

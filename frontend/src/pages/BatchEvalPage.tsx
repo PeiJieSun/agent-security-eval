@@ -52,11 +52,12 @@ function StatusChip({ status }: { status: string }) {
     done: "text-emerald-700 border-emerald-200 bg-emerald-50",
     done_with_errors: "text-amber-700 border-amber-200 bg-amber-50",
     failed: "text-red-700 border-red-200 bg-red-50",
+    cancelled: "text-slate-500 border-slate-200 bg-slate-50",
     pending: "text-slate-500 border-slate-200 bg-slate-50",
   };
   const label: Record<string, string> = {
     running: "运行中", done: "完成", done_with_errors: "完成(含错误)",
-    failed: "失败", pending: "等待",
+    failed: "失败", cancelled: "已停止", pending: "等待",
   };
   return (
     <span className={`text-[11px] px-2 py-0.5 rounded border flex items-center gap-1.5 ${map[status] ?? "bg-slate-50 text-slate-500 border-slate-200"}`}>
@@ -133,6 +134,7 @@ export default function BatchEvalPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [activeBatch, setActiveBatch] = useState<Batch | null>(null);
   const [launching, setLaunching] = useState(false);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -207,6 +209,21 @@ export default function BatchEvalPage() {
       setError(String(e));
     } finally {
       setLaunching(false);
+    }
+  };
+
+  const stopBatch = async (batch_id: string) => {
+    setCancelling(batch_id);
+    try {
+      await api.cancelBatch(batch_id);
+      setBatches(prev => prev.map(b => b.batch_id === batch_id ? { ...b, status: "cancelled" } : b));
+      if (activeBatch?.batch_id === batch_id) setActiveBatch(b => b ? { ...b, status: "cancelled" } : b);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      loadBatches();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -295,7 +312,19 @@ export default function BatchEvalPage() {
               </p>
               <span className="font-mono text-[11px] text-slate-400">{activeBatch.batch_id}</span>
             </div>
-            <StatusChip status={activeBatch.status} />
+            <div className="flex items-center gap-2">
+              <StatusChip status={activeBatch.status} />
+              {isRunning && (
+                <button
+                  onClick={() => stopBatch(activeBatch.batch_id)}
+                  disabled={cancelling === activeBatch.batch_id}
+                  className="text-[11px] px-2.5 py-0.5 rounded border border-red-200 text-red-600
+                             hover:bg-red-50 disabled:opacity-40 transition-colors"
+                >
+                  {cancelling === activeBatch.batch_id ? "停止中…" : "■ 停止"}
+                </button>
+              )}
+            </div>
           </div>
 
           <AnimatedProgressBar
@@ -350,7 +379,7 @@ export default function BatchEvalPage() {
                     </div>
                   )}
                 </div>
-                <div className="text-right text-[12px] shrink-0">
+                <div className="text-right text-[12px] shrink-0 space-y-1">
                   <div className="text-slate-700 font-medium">
                     {b.done_count}/{b.total}
                     {b.failed_count > 0 && <span className="text-red-500 ml-1">({b.failed_count} 失败)</span>}
@@ -358,6 +387,16 @@ export default function BatchEvalPage() {
                   <div className="text-slate-400 text-[11px]">
                     {new Date(b.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </div>
+                  {b.status === "running" && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); stopBatch(b.batch_id); }}
+                      disabled={cancelling === b.batch_id}
+                      className="text-[10px] px-2 py-0.5 rounded border border-red-200 text-red-500
+                                 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                    >
+                      {cancelling === b.batch_id ? "停止中" : "■ 停止"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

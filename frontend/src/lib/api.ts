@@ -255,6 +255,8 @@ export const api = {
   }) => req<{ batch_id: string; status: string; total: number; done_count: number; failed_count: number }>(
     "/batch-evals", { method: "POST", body: JSON.stringify(body) }
   ),
+  cancelBatch: (batch_id: string) =>
+    req<{ batch_id: string; status: string }>(`/batch-evals/${batch_id}`, { method: "DELETE" }),
 
   // M3-3: Release Gate
   getReleaseGate: (eval_id: string) =>
