@@ -18,6 +18,7 @@ import ToolCallGraphPage from "./pages/ToolCallGraphPage";
 import EvoAttackPage from "./pages/EvoAttackPage";
 import ReleaseGatePage from "./pages/ReleaseGatePage";
 import BehaviorTrendPage from "./pages/BehaviorTrendPage";
+import BatchEvalPage from "./pages/BatchEvalPage";
 
 export default function App() {
   return (
@@ -53,6 +54,8 @@ export default function App() {
           {/* M2-4 */}
           <Route path="/safety/evo-attack" element={<EvoAttackPage />} />
           <Route path="/safety/evo-attack/:safety_id" element={<EvoAttackPage />} />
+          {/* Batch eval */}
+          <Route path="/batch-eval" element={<BatchEvalPage />} />
           {/* M3-3 */}
           <Route path="/release-gate" element={<ReleaseGatePage />} />
           {/* M3-5 */}

@@ -58,6 +58,15 @@ class CreateEvalRequest(BaseModel):
     base_url: Optional[str] = None
 
 
+class CreateBatchRequest(BaseModel):
+    task_ids: Optional[list[str]] = None          # None = all tasks
+    domains: Optional[list[str]] = None           # "email" | "research" | "chinese"
+    injection_styles: Optional[list[str]] = None  # None = all styles
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
 class TestConnectionRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
@@ -183,6 +192,83 @@ def delete_eval(eval_id: str) -> None:
     except KeyError:
         raise HTTPException(status_code=404, detail=f"eval {eval_id!r} not found")
     _store.delete_eval(eval_id)
+
+
+@router.get("/batch-evals")
+def list_batches() -> list[dict]:
+    """List recent batch evaluation jobs."""
+    return _store.list_batches()
+
+
+@router.get("/batch-evals/{batch_id}")
+def get_batch(batch_id: str) -> dict:
+    try:
+        return _store.get_batch(batch_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"batch {batch_id!r} not found")
+
+
+@router.post("/batch-evals", status_code=202)
+def create_batch(req: CreateBatchRequest, background_tasks: BackgroundTasks) -> dict:
+    """
+    Start a batch evaluation across multiple tasks × injection styles.
+    Returns immediately with batch_id; poll GET /batch-evals/{id} for progress.
+    """
+    from agent_eval.task_spec import InjectionStyle
+
+    api_key = req.api_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="未提供 API Key")
+
+    model = req.model or settings.default_model
+    base_url = req.base_url or settings.openai_base_url
+
+    # Build task list filtered by domain
+    domain_filter = set(req.domains) if req.domains else None
+    all_tasks = list(DEMO_TASKS_BY_ID.values())
+    tasks = []
+    for t in all_tasks:
+        if domain_filter is None:
+            tasks.append(t)
+        else:
+            task_domains = set()
+            for tag in t.tags:
+                if tag in ("email", "research", "chinese"):
+                    task_domains.add(tag)
+            if task_domains & domain_filter:
+                tasks.append(t)
+    if req.task_ids:
+        tasks = [t for t in tasks if t.task_id in req.task_ids]
+
+    # Build style list
+    all_styles = [s for s in InjectionStyle]
+    if req.injection_styles:
+        styles = [s for s in all_styles if s.value in req.injection_styles]
+    else:
+        styles = all_styles
+
+    if not tasks or not styles:
+        raise HTTPException(status_code=400, detail="No tasks or styles selected")
+
+    combos = [(t, s) for t in tasks for s in styles]
+    batch_id = "batch_" + uuid.uuid4().hex[:10]
+    config = {
+        "model": model,
+        "domains": req.domains,
+        "injection_styles": [s.value for s in styles],
+        "task_ids": [t.task_id for t in tasks],
+    }
+    batch = _store.create_batch(batch_id, model, len(combos), config)
+
+    background_tasks.add_task(
+        _run_batch_background,
+        batch_id=batch_id,
+        combos=[(t.task_id, s.value) for t, s in combos],
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+    )
+    return batch
 
 
 @router.post("/evals", status_code=202)
@@ -312,18 +398,72 @@ def _make_step_callback(eval_id: str):
     return callback
 
 
+def _run_batch_background(
+    batch_id: str,
+    combos: list[tuple[str, str]],  # [(task_id, style_value), ...]
+    model: str,
+    api_key: str,
+    base_url: str,
+) -> None:
+    """Run all (task, style) combinations sequentially and update batch progress."""
+    import time as _time
+    from agent_eval.task_spec import InjectionStyle
+
+    done = 0
+    failed = 0
+    for task_id, style_value in combos:
+        try:
+            # Override the task's injection style
+            base_task = DEMO_TASKS_BY_ID[task_id]
+            # Build a modified task with the requested style
+            from agent_eval.task_spec import EvalTask, InjectionVector
+            av = base_task.attack_vector
+            new_av = InjectionVector(
+                target_tool=av.target_tool,
+                field_path=av.field_path,
+                payload=av.payload,
+                inject_index=av.inject_index,
+                style=InjectionStyle(style_value),
+            )
+            task = EvalTask(
+                task_id=base_task.task_id,
+                description=base_task.description,
+                environment_type=base_task.environment_type,
+                environment_config=base_task.environment_config,
+                user_instruction=base_task.user_instruction,
+                attack_vector=new_av,
+                benign_success_expr=base_task.benign_success_expr,
+                attack_success_expr=base_task.attack_success_expr,
+                attack_type=base_task.attack_type,
+                tags=base_task.tags,
+                max_steps=base_task.max_steps,
+            )
+            eval_record = _store.create_eval(task_id, model)
+            eval_id = eval_record["eval_id"]
+            _run_eval_background(eval_id, task_id, model, api_key, base_url, override_task=task)
+            done += 1
+        except Exception:
+            failed += 1
+        _store.update_batch(batch_id, done_count=done, failed_count=failed)
+        _time.sleep(0.5)  # brief pause between calls
+
+    final_status = "done" if failed == 0 else ("failed" if done == 0 else "done_with_errors")
+    _store.update_batch(batch_id, status=final_status, done_count=done, failed_count=failed)
+
+
 def _run_eval_background(
     eval_id: str,
     task_id: str,
     model: str,
     api_key: str,
     base_url: str,
+    override_task=None,
 ) -> None:
     from agent_eval.monitor import EVENT_TYPES
     _store.update_eval(eval_id, status="running")
     step_cb = _make_step_callback(eval_id)
     try:
-        task = DEMO_TASKS_BY_ID[task_id]
+        task = override_task if override_task is not None else DEMO_TASKS_BY_ID[task_id]
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model,
                         max_steps=task.max_steps)
         runner = LLMAgentRunner(cfg)
@@ -367,8 +507,9 @@ def _run_eval_background(
             event_type=EVENT_TYPES["done"],
             eval_id=eval_id,
             data={"eval_id": eval_id, "report_summary": {
-                "benign_utility": report.metrics.get("benign_utility", {}).get("value"),
-                "targeted_asr": report.metrics.get("targeted_asr", {}).get("value"),
+                "benign_utility": report.benign_utility.value,
+                "targeted_asr": report.targeted_asr.value,
+                "utility_under_attack": report.utility_under_attack.value,
             }},
         ))
 

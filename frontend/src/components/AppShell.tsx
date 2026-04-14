@@ -16,6 +16,7 @@ const NAV: NavSection[] = [
     items: [
       { label: "评测列表", path: "/" },
       { label: "新建评测", path: "/evals/new" },
+      { label: "批量评测", path: "/batch-eval" },
       { label: "评测标准", path: "/standards" },
       { label: "发布门", path: "/release-gate" },
     ],

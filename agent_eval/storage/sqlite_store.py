@@ -136,6 +136,17 @@ class SqliteStore:
                     targeted_asr    REAL NOT NULL DEFAULT 0.0,
                     utility_under_attack REAL NOT NULL DEFAULT 0.0
                 );
+                CREATE TABLE IF NOT EXISTS batch_evals (
+                    batch_id    TEXT PRIMARY KEY,
+                    model       TEXT NOT NULL,
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    total       INTEGER NOT NULL DEFAULT 0,
+                    done_count  INTEGER NOT NULL DEFAULT 0,
+                    failed_count INTEGER NOT NULL DEFAULT 0,
+                    config      TEXT NOT NULL DEFAULT '{}',
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL
+                );
             """)
 
     # ── Runs ──────────────────────────────────────────────────────────────
@@ -406,6 +417,49 @@ class SqliteStore:
                 "SELECT task_id, COUNT(*) as snapshot_count FROM behavior_snapshots GROUP BY task_id"
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ── Batch evals ───────────────────────────────────────────────────────────
+
+    def create_batch(self, batch_id: str, model: str, total: int, config: dict) -> dict:
+        now = _now()
+        with self._conn() as con:
+            con.execute(
+                "INSERT INTO batch_evals (batch_id, model, status, total, done_count, failed_count, config, created_at, updated_at) "
+                "VALUES (?, ?, 'running', ?, 0, 0, ?, ?, ?)",
+                (batch_id, model, total, json.dumps(config), now, now),
+            )
+        return self.get_batch(batch_id)
+
+    def get_batch(self, batch_id: str) -> dict:
+        with self._conn() as con:
+            row = con.execute("SELECT * FROM batch_evals WHERE batch_id=?", (batch_id,)).fetchone()
+        if row is None:
+            raise KeyError(batch_id)
+        d = dict(row)
+        d["config"] = json.loads(d["config"])
+        return d
+
+    def update_batch(self, batch_id: str, **kwargs) -> None:
+        fields = {k: v for k, v in kwargs.items() if k in ("status", "done_count", "failed_count")}
+        if not fields:
+            return
+        fields["updated_at"] = _now()
+        sets = ", ".join(f"{k}=?" for k in fields)
+        with self._conn() as con:
+            con.execute(f"UPDATE batch_evals SET {sets} WHERE batch_id=?",
+                        (*fields.values(), batch_id))
+
+    def list_batches(self, limit: int = 20) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM batch_evals ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["config"] = json.loads(d["config"])
+            result.append(d)
+        return result
 
     def get_safety_result(self, safety_id: str) -> dict:
         with self._conn() as con:

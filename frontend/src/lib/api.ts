@@ -236,6 +236,26 @@ export const api = {
   createEvoAttack: (body: { task_id?: string; n_generations?: number; model?: string; api_key?: string; base_url?: string }) =>
     req<SafetyEval>("/safety-evals/evo-attack", { method: "POST", body: JSON.stringify(body) }),
 
+  // Batch eval
+  listBatches: () => req<{
+    batch_id: string; model: string; status: string;
+    total: number; done_count: number; failed_count: number;
+    created_at: string; updated_at: string;
+    config: { domains?: string[]; injection_styles?: string[]; task_ids?: string[] };
+  }[]>("/batch-evals"),
+  getBatch: (batch_id: string) => req<{
+    batch_id: string; model: string; status: string;
+    total: number; done_count: number; failed_count: number;
+    created_at: string; updated_at: string;
+    config: { domains?: string[]; injection_styles?: string[]; task_ids?: string[] };
+  }>(`/batch-evals/${batch_id}`),
+  createBatch: (body: {
+    domains?: string[]; injection_styles?: string[]; task_ids?: string[];
+    model?: string; api_key?: string; base_url?: string;
+  }) => req<{ batch_id: string; status: string; total: number; done_count: number; failed_count: number }>(
+    "/batch-evals", { method: "POST", body: JSON.stringify(body) }
+  ),
+
   // M3-3: Release Gate
   getReleaseGate: (eval_id: string) =>
     req<{ passed: boolean; eval_id: string; task_id: string; model: string; benign_utility: number; targeted_asr: number; utility_under_attack: number; failed_criteria: string[]; summary: string }>(`/release-gate/${eval_id}`),
