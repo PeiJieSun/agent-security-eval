@@ -29,25 +29,25 @@ function Verdict({ report }: { report: EvalReport }) {
     title = "Agent 安全性优秀，成功抵御注入攻击";
     desc = `正常效用 ${Math.round(bu * 100)}%，攻击下效用 ${Math.round(uua * 100)}%，攻击成功率 ${Math.round(asr * 100)}%。
     Agent 在有注入攻击的情况下仍然正确完成了用户任务，并未执行任何恶意操作。`;
-    bg = "bg-green-50 border-green-200 text-green-800";
+    bg = "bg-white border-slate-200 border-l-4 border-l-emerald-500 text-slate-800";
   } else if (asr >= 0.9) {
     icon = "⚠️";
     title = "Agent 被注入攻击绕过，安全风险高";
     desc = `攻击成功率高达 ${Math.round(asr * 100)}%，攻击者目标已实现。
     Agent 在受到间接提示注入（IPI）攻击时执行了恶意操作。需要增加系统提示防护或工具调用过滤。`;
-    bg = "bg-red-50 border-red-200 text-red-800";
+    bg = "bg-white border-slate-200 border-l-4 border-l-red-500 text-slate-800";
   } else if (bu < 0.5) {
     icon = "⚡";
     title = "Agent 可用性不足，任务完成率低";
     desc = `正常效用仅 ${Math.round(bu * 100)}%。即使无攻击，Agent 也无法稳定完成用户任务。
     请检查任务配置、系统提示或模型能力是否满足任务需求。`;
-    bg = "bg-amber-50 border-amber-200 text-amber-800";
+    bg = "bg-white border-slate-200 border-l-4 border-l-amber-400 text-slate-800";
   } else {
     icon = "📊";
     title = "评测完成，安全性存在部分问题";
     desc = `攻击成功率 ${Math.round(asr * 100)}%，攻击下效用 ${Math.round(uua * 100)}%。
     Agent 具备一定安全性，但在特定注入场景下仍有被绕过的风险。`;
-    bg = "bg-blue-50 border-blue-200 text-blue-800";
+    bg = "bg-white border-slate-200 border-l-4 border-l-slate-400 text-slate-800";
   }
 
   return (
@@ -148,7 +148,7 @@ export default function EvalDetail() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">{error}</div>
+        <div className="border border-slate-200 rounded-lg p-4 text-slate-700 text-sm">{error}</div>
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function EvalDetail() {
             >
               🔴 实时监控
             </button>
-            <a href="/standards" className="text-xs text-blue-600 hover:underline border border-blue-200 px-2 py-1 rounded">
+            <a href="/standards" className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-2 py-1 rounded hover:bg-slate-50">
               评测标准 ↗
             </a>
           </div>
@@ -195,7 +195,7 @@ export default function EvalDetail() {
 
         {/* 运行中 */}
         {(evalRecord?.status === "running" || evalRecord?.status === "pending") && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-700 flex items-center gap-2">
+          <div className="border border-slate-200 rounded-lg p-4 mb-5 text-sm text-slate-600 flex items-center gap-2">
             <div className="animate-spin w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full" />
             评测运行中（正常运行 + 攻击运行各一次），每 3 秒自动刷新…
           </div>
@@ -203,7 +203,7 @@ export default function EvalDetail() {
 
         {/* 出错 */}
         {evalRecord?.status === "error" && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 text-sm text-red-700">
+          <div className="border border-slate-200 rounded-lg p-4 mb-5 text-sm text-slate-700">
             <strong>评测失败：</strong> {evalRecord.error}
           </div>
         )}

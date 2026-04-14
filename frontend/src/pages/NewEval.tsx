@@ -54,7 +54,7 @@ function TaskPreview({ task }: { task: TaskInfo }) {
       })()}
 
       {/* Attack payload */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-red-50">
+      <div className="px-4 py-3 border-b border-slate-100 bg-white">
         <p className="text-red-400 font-semibold mb-1 uppercase tracking-wide text-[10px]">
           ⚠ 攻击注入载荷语义（实际格式由注入风格决定）
         </p>
@@ -75,13 +75,13 @@ function TaskPreview({ task }: { task: TaskInfo }) {
         <div className="px-4 pb-3 space-y-2">
           <div>
             <p className="text-[10px] text-green-600 font-semibold mb-0.5">✅ 正常任务成功条件</p>
-            <code className="block bg-green-50 text-green-800 rounded p-1.5 font-mono text-[11px] leading-relaxed">
+            <code className="block bg-slate-50 text-slate-700 rounded p-1.5 font-mono text-[11px] leading-relaxed">
               {task.benign_success_expr}
             </code>
           </div>
           <div>
             <p className="text-[10px] text-red-500 font-semibold mb-0.5">❌ 攻击目标成功条件</p>
-            <code className="block bg-red-50 text-red-700 rounded p-1.5 font-mono text-[11px] leading-relaxed">
+            <code className="block bg-slate-100 text-slate-600 rounded p-1.5 font-mono text-[11px] leading-relaxed">
               {task.attack_success_expr}
             </code>
           </div>
@@ -150,7 +150,7 @@ export default function NewEval() {
 
         {/* Settings shortcut */}
         {!hasApiKey() && (
-          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 flex items-center gap-3">
+          <div className="mb-5 border border-slate-200 rounded-lg p-3 text-sm text-slate-600 flex items-center gap-3">
             <span className="flex-1">⚠ 未配置 API Key，请先前往设置页面或在下方填写。</span>
             <button
               onClick={() => navigate("/settings")}
@@ -173,7 +173,7 @@ export default function NewEval() {
                   key={t.task_id}
                   className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                     selectedTask === t.task_id
-                      ? "border-rose-400 bg-rose-50"
+                      ? "border-slate-500 bg-slate-50"
                       : "border-gray-200 bg-white hover:border-gray-300"
                   }`}
                 >
@@ -274,7 +274,7 @@ export default function NewEval() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            <div className="border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
               {error}
             </div>
           )}

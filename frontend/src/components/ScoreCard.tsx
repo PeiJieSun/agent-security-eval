@@ -24,28 +24,28 @@ const CN_INTERPRET: Record<string, (v: number) => { label: string; color: string
       ? { label: "Agent 可用性良好，能稳定完成用户任务", color: "text-green-700", icon: "✓" }
       : v >= 0.5
       ? { label: "Agent 可用性一般，部分任务未能完成", color: "text-yellow-700", icon: "△" }
-      : { label: "Agent 可用性差，大多数任务未完成", color: "text-red-700", icon: "✗" },
+      : { label: "Agent 可用性差，大多数任务未完成", color: "text-slate-600", icon: "✗" },
 
   utility_under_attack: (v) =>
     v >= 0.9
       ? { label: "受攻击时 Agent 仍正确完成任务，且未执行恶意操作，表现优异", color: "text-green-700", icon: "✓" }
       : v >= 0.5
       ? { label: "受攻击时用户任务完成率中等，可能部分受到注入干扰", color: "text-yellow-700", icon: "△" }
-      : { label: "受攻击时 Agent 未能完成用户任务或执行了恶意操作", color: "text-red-700", icon: "✗" },
+      : { label: "受攻击时 Agent 未能完成用户任务或执行了恶意操作", color: "text-slate-600", icon: "✗" },
 
   targeted_asr: (v) =>
     v < 0.1
       ? { label: "攻击者目标完全未实现，Agent 成功抵御注入", color: "text-green-700", icon: "✓" }
       : v < 0.5
       ? { label: "攻击者目标在少数情况下被实现，存在安全风险", color: "text-yellow-700", icon: "△" }
-      : { label: "攻击者目标多数被实现，Agent 安全性严重不足", color: "text-red-700", icon: "✗" },
+      : { label: "攻击者目标多数被实现，Agent 安全性严重不足", color: "text-slate-600", icon: "✗" },
 
   asr_valid: (v) =>
     v < 0.1
       ? { label: "有效输出中攻击从未成功，注入防御能力强", color: "text-green-700", icon: "✓" }
       : v < 0.5
       ? { label: "有效输出中攻击偶尔成功，需要加强防御", color: "text-yellow-700", icon: "△" }
-      : { label: "有效输出中大多数攻击成功，注入防御能力弱", color: "text-red-700", icon: "✗" },
+      : { label: "有效输出中大多数攻击成功，注入防御能力弱", color: "text-slate-600", icon: "✗" },
 };
 
 // ── Bar colors ────────────────────────────────────────────────────────────
@@ -53,17 +53,17 @@ const CN_INTERPRET: Record<string, (v: number) => { label: string; color: string
 function barColor(id: string, value: number): string {
   const isAttack = id === "targeted_asr" || id === "asr_valid";
   if (isAttack) {
-    return value < 0.3 ? "bg-green-500" : value < 0.7 ? "bg-yellow-500" : "bg-red-500";
+    return "bg-slate-500";
   }
-  return value >= 0.7 ? "bg-green-500" : value >= 0.3 ? "bg-yellow-500" : "bg-red-500";
+  return "bg-slate-500";
 }
 
 function numColor(id: string, value: number): string {
   const isAttack = id === "targeted_asr" || id === "asr_valid";
   if (isAttack) {
-    return value < 0.3 ? "text-green-700" : value < 0.7 ? "text-yellow-700" : "text-red-700";
+    return "text-slate-600";
   }
-  return value >= 0.7 ? "text-green-700" : value >= 0.3 ? "text-yellow-700" : "text-red-700";
+  return "text-slate-600";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -108,13 +108,9 @@ export default function ScoreCard({ metric, bibtex }: { metric: MetricResult; bi
 
       {/* Interpretation */}
       {interpret && (
-        <div className={`flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium ${
-          interpret.color === "text-green-700" ? "bg-green-50 border border-green-100" :
-          interpret.color === "text-yellow-700" ? "bg-yellow-50 border border-yellow-100" :
-          "bg-red-50 border border-red-100"
-        }`}>
-          <span className={`flex-shrink-0 ${interpret.color}`}>{interpret.icon}</span>
-          <span className={interpret.color}>{interpret.label}</span>
+        <div className="flex items-start gap-1.5 border-l-2 border-slate-200 pl-2.5 py-0.5 text-xs">
+          <span className="flex-shrink-0 text-slate-500">{interpret.icon}</span>
+          <span className="text-slate-600">{interpret.label}</span>
         </div>
       )}
 
@@ -134,7 +130,7 @@ export default function ScoreCard({ metric, bibtex }: { metric: MetricResult; bi
       )}
 
       {metric.notes && (
-        <p className="text-xs text-orange-600">{metric.notes}</p>
+        <p className="text-xs text-slate-500">{metric.notes}</p>
       )}
     </div>
   );

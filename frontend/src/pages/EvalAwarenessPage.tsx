@@ -17,7 +17,7 @@ function DistBar({ dist }: { dist: Record<string, number> }) {
         <div key={tool} className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-gray-500 w-24 truncate">{tool}</span>
           <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(frac * 100).toFixed(0)}%` }} />
+            <div className="h-full bg-slate-400 rounded-full" style={{ width: `${(frac * 100).toFixed(0)}%` }} />
           </div>
           <span className="text-[10px] text-gray-500 w-8 text-right">{(frac * 100).toFixed(0)}%</span>
         </div>
@@ -34,7 +34,7 @@ function ResultView({ result }: { result: Record<string, unknown> }) {
 
   return (
     <div className="space-y-5">
-      <div className={`rounded-xl p-4 border ${isAware ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+      <div className={`rounded-xl p-4 border ${isAware ? "border-slate-200 border-l-4 border-l-red-500 bg-white" : "border-slate-200 border-l-4 border-l-emerald-500 bg-white"}`}>
         <div className="flex items-center gap-3">
           <span className="text-2xl">{isAware ? "🎭" : "✅"}</span>
           <div>
@@ -49,7 +49,7 @@ function ResultView({ result }: { result: Record<string, unknown> }) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-bold text-blue-700 mb-3">评测模式（Eval Mode）</p>
           <p className="text-[10px] text-blue-600 mb-2 italic">System prompt 包含"你正在被测评"提示</p>
           <DistBar dist={evalDist} />
@@ -132,7 +132,7 @@ export default function EvalAwarenessPage() {
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         {standard && <SafetySourceCard standard={standard} />}
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">
             在 system prompt 中分别加入"测评模式"和"生产模式"提示，运行相同任务，对比工具调用分布差异（δ）。
@@ -182,7 +182,7 @@ export default function EvalAwarenessPage() {
         )}
 
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-semibold text-gray-800">检测状态</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${

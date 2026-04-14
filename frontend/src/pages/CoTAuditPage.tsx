@@ -53,9 +53,7 @@ function ResultView({ result }: { result: CoTResult }) {
   return (
     <div className="space-y-5">
       <div className={`rounded-xl p-4 border ${
-        result.verdict === "HONEST" ? "bg-green-50 border-green-200" :
-        result.verdict === "DECEPTIVE" ? "bg-red-50 border-red-200" :
-        "bg-amber-50 border-amber-200"
+        result.verdict === "HONEST" ? "border-slate-200 border-l-4 border-l-emerald-500 bg-white" : result.verdict === "DECEPTIVE" ? "border-slate-200 border-l-4 border-l-red-500 bg-white" : "border-slate-200 border-l-4 border-l-amber-400 bg-white"
       }`}>
         <div className="flex items-center gap-3 mb-2">
           <span className="text-2xl">
@@ -84,7 +82,7 @@ function ResultView({ result }: { result: CoTResult }) {
           {result.audited_steps.map((step) => (
             <div
               key={step.step_k}
-              className={`rounded-lg border p-3 cursor-pointer ${!step.is_consistent ? "border-red-200 bg-red-50" : "border-gray-200 bg-white"}`}
+              className={`rounded-lg border p-3 cursor-pointer ${!step.is_consistent ? "border-slate-300 bg-slate-50" : "border-slate-100 bg-white"}`}
               onClick={() => setExpanded(expanded === step.step_k ? null : step.step_k)}
             >
               <div className="flex items-center gap-2">
@@ -97,7 +95,7 @@ function ResultView({ result }: { result: CoTResult }) {
               {expanded === step.step_k && (
                 <div className="mt-3 space-y-2 text-xs">
                   {step.reasoning ? (
-                    <div className="bg-purple-50 rounded p-2">
+                    <div className="bg-slate-50 rounded p-2">
                       <p className="text-purple-500 font-semibold mb-1">推理内容</p>
                       <p className="text-purple-800 leading-relaxed">{step.reasoning}</p>
                     </div>
@@ -105,7 +103,7 @@ function ResultView({ result }: { result: CoTResult }) {
                     <p className="text-gray-400 italic">此步骤无推理内容（未使用 CoT 模式）</p>
                   )}
                   {step.mismatch_reason && (
-                    <div className="bg-red-50 rounded p-2">
+                    <div className="bg-slate-50 rounded p-2">
                       <p className="text-red-500 font-semibold mb-1">不一致原因</p>
                       <p className="text-red-700 leading-relaxed">{step.mismatch_reason}</p>
                     </div>
@@ -187,7 +185,7 @@ export default function CoTAuditPage() {
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         {standard && <SafetySourceCard standard={standard} />}
-        <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">
             对 Agent 的每步推理（&lt;thinking&gt;）与实际工具调用进行语义一致性评估。
@@ -244,7 +242,7 @@ export default function CoTAuditPage() {
         )}
 
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-semibold text-gray-800">审计状态</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${

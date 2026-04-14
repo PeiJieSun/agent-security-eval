@@ -50,7 +50,7 @@ function StepCard({ step, idx }: { step: TrajectoryStep; idx: number }) {
       <div
         className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 flex items-center justify-center text-[9px] font-black ${
           isError
-            ? "border-rose-400 bg-rose-50 text-rose-600"
+            ? "border-slate-300 bg-slate-100 text-slate-700"
             : "border-slate-300 bg-white text-slate-500"
         }`}
       >
@@ -75,12 +75,12 @@ function StepCard({ step, idx }: { step: TrajectoryStep; idx: number }) {
             </span>
           )}
           {isError && (
-            <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-bold">
+            <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded font-bold">
               error
             </span>
           )}
           {(step.observation.status === "ok" || !isError) && !isError && (
-            <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
+            <span className="text-[10px] bg-emerald-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded font-bold">
               ok
             </span>
           )}
@@ -114,7 +114,7 @@ function StepCard({ step, idx }: { step: TrajectoryStep; idx: number }) {
                 className={`text-[11px] font-mono rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed ${
                   isError
                     ? "bg-rose-50 text-rose-800"
-                    : "bg-emerald-50 text-emerald-900"
+                    : "bg-emerald-50 text-slate-900"
                 }`}
               >
                 {JSON.stringify(step.observation, null, 2)}
@@ -221,7 +221,7 @@ export default function RunDetail() {
               </p>
               {hasDiff ? (
                 <div className="flex flex-wrap gap-2">
-                  <DiffPill label="+added" n={diff.added.length} color="bg-emerald-100 text-emerald-700 border-emerald-200" />
+                  <DiffPill label="+added" n={diff.added.length} color="bg-emerald-100 text-slate-600 border-slate-200" />
                   <DiffPill label="~modified" n={diff.modified.length} color="bg-amber-100 text-amber-700 border-amber-200" />
                   <DiffPill label="-removed" n={diff.removed.length} color="bg-rose-100 text-rose-700 border-rose-200" />
                 </div>

@@ -73,7 +73,7 @@ function StepCard({ ev }: { ev: StepEvent }) {
   const [open, setOpen] = useState(false);
   const isAttack = ev.run_type === "attack";
   return (
-    <div className={`rounded-xl border px-4 py-3 text-sm ${isAttack ? "border-rose-200 bg-rose-50/40" : "border-slate-200 bg-white"}`}>
+    <div className={`rounded-xl border px-4 py-3 text-sm ${isAttack ? "border-slate-300 bg-slate-50/50" : "border-slate-200 bg-white"}`}>
       <div className="flex items-center gap-2">
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isAttack ? "bg-rose-200 text-rose-800" : "bg-blue-100 text-blue-700"}`}>
           {isAttack ? "攻击 run" : "正常 run"}
@@ -84,7 +84,7 @@ function StepCard({ ev }: { ev: StepEvent }) {
         <button onClick={() => setOpen(o => !o)} className="text-slate-400 text-xs">{open ? "▲" : "▼"}</button>
       </div>
       {ev.reasoning && (
-        <div className="mt-2 text-[11px] italic text-purple-700 bg-purple-50 rounded p-2 border border-purple-200">
+        <div className="mt-2 text-[11px] italic text-slate-600 bg-slate-50 rounded p-2 border border-slate-200">
           🧠 {ev.reasoning.slice(0, 200)}{ev.reasoning.length > 200 ? "…" : ""}
         </div>
       )}
@@ -124,7 +124,7 @@ function AlertCard({ ev }: { ev: AlertEvent }) {
 function DoneCard({ ev }: { ev: DoneEvent }) {
   const s = ev.report_summary;
   return (
-    <div className="rounded-xl border-2 border-green-400 bg-green-50 px-4 py-3 text-sm text-green-800">
+    <div className="rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3 text-sm text-slate-700">
       <div className="font-bold text-base mb-1">✅ 评测完成</div>
       {s && (
         <div className="flex gap-4 text-xs">

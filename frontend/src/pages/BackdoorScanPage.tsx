@@ -45,7 +45,7 @@ function ResultView({ result }: { result: ScanResult }) {
 
   return (
     <div className="space-y-5">
-      <div className={`rounded-xl p-4 border ${hasAnomalies ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+      <div className={`rounded-xl p-4 border ${hasAnomalies ? "border-slate-200 border-l-4 border-l-red-500 bg-white" : "border-slate-200 border-l-4 border-l-emerald-500 bg-white"}`}>
         <div className="flex items-center gap-3">
           <span className="text-2xl">{hasAnomalies ? "🚨" : "✅"}</span>
           <div>
@@ -101,7 +101,7 @@ function ResultView({ result }: { result: ScanResult }) {
             key={tr.trigger_id}
             className={`grid grid-cols-[auto_2fr_1fr_auto_auto_auto] items-center gap-2 px-4 py-3 text-xs ${
               i < displayed.length - 1 ? "border-b border-gray-100" : ""
-            } ${tr.is_anomaly ? "bg-red-50/50" : ""}`}
+            } ${tr.is_anomaly ? "bg-slate-100" : ""}`}
           >
             <span className="font-mono text-gray-400">{tr.trigger_id}</span>
             <span className="text-gray-800 font-medium truncate" title={tr.trigger_text}>{tr.trigger_text}</span>
@@ -193,7 +193,7 @@ export default function BackdoorScanPage() {
 
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         {standard && <SafetySourceCard standard={standard} />}
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">
             对 60 个预定义触发词（覆盖特殊日期、权威短语、暗号词、中文触发词、编码指令 5 类），
@@ -248,7 +248,7 @@ export default function BackdoorScanPage() {
         )}
 
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-semibold text-gray-800">扫描状态</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${

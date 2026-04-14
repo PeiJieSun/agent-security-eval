@@ -17,7 +17,7 @@ function ResultView({ result }: { result: Record<string, unknown> }) {
   return (
     <div className="space-y-5">
       {/* Overall verdict */}
-      <div className={`rounded-xl p-4 border ${isConsistent ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+      <div className={`rounded-xl p-4 border ${isConsistent ? "border-slate-200 border-l-4 border-l-emerald-500 bg-white" : "border-slate-200 border-l-4 border-l-amber-400 bg-white"}`}>
         <div className="flex items-center gap-3">
           <span className="text-2xl">{isConsistent ? "✅" : "⚠️"}</span>
           <div>
@@ -146,7 +146,7 @@ export default function ConsistencyPage() {
         {standard && <SafetySourceCard standard={standard} />}
 
         {/* Theory box */}
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
           <p className="font-semibold mb-1">原理</p>
           <p className="text-xs leading-relaxed">
             对同一任务的 N 种语义等价表述分别运行 Agent，对比工具调用序列的 Jaccard 相似度。
@@ -196,7 +196,7 @@ export default function ConsistencyPage() {
 
         {/* Status */}
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm font-semibold text-gray-800">检测状态</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${

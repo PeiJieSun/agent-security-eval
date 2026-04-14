@@ -275,7 +275,7 @@ function ProfileCard({
     <div
       className={`rounded-xl border p-4 transition-all ${
         profile.isActive
-          ? "border-rose-400 bg-rose-50 shadow-sm"
+          ? "border-slate-400 bg-slate-50 shadow-sm"
           : "border-gray-200 bg-white hover:border-gray-300"
       }`}
     >
@@ -285,7 +285,7 @@ function ProfileCard({
             type="button"
             onClick={onActivate}
             className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-colors ${
-              profile.isActive ? "border-rose-500 bg-rose-500" : "border-gray-300"
+              profile.isActive ? "border-slate-700 bg-slate-700" : "border-gray-300"
             }`}
             title="设为默认"
           />
@@ -443,7 +443,7 @@ export default function SettingsPage() {
         )}
 
         {/* Env var fallback */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700">
+        <div className="mt-6 border border-slate-200 rounded-lg p-4 text-xs text-slate-600">
           <p className="font-semibold mb-1">服务端环境变量（永久备用）</p>
           <pre className="font-mono leading-5">
 {`export OPENAI_API_KEY=sk-...
