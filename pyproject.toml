@@ -13,6 +13,7 @@ dependencies = [
     "pytest>=8.0",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
+    "openai>=1.0",
 ]
 
 [tool.setuptools.packages.find]
