@@ -29,6 +29,21 @@ Schema
     eval_id      TEXT PRIMARY KEY
     json_blob    TEXT NOT NULL   -- AgentEvalReport.model_dump_json()
     created_at   TEXT NOT NULL
+
+  safety_evals:
+    safety_id    TEXT PRIMARY KEY
+    eval_type    TEXT NOT NULL   -- "consistency" | "eval_awareness" | "cot_audit" | "backdoor_scan"
+    task_id      TEXT NOT NULL
+    model        TEXT NOT NULL
+    status       TEXT NOT NULL  -- "pending" | "running" | "done" | "error"
+    error        TEXT
+    created_at   TEXT NOT NULL
+    updated_at   TEXT NOT NULL
+
+  safety_results:
+    safety_id    TEXT PRIMARY KEY
+    json_blob    TEXT NOT NULL   -- result model_dump_json()
+    created_at   TEXT NOT NULL
 """
 from __future__ import annotations
 
@@ -92,6 +107,21 @@ class SqliteStore:
                 );
                 CREATE TABLE IF NOT EXISTS reports (
                     eval_id     TEXT PRIMARY KEY,
+                    json_blob   TEXT NOT NULL,
+                    created_at  TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS safety_evals (
+                    safety_id   TEXT PRIMARY KEY,
+                    eval_type   TEXT NOT NULL,
+                    task_id     TEXT NOT NULL,
+                    model       TEXT NOT NULL,
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    error       TEXT,
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS safety_results (
+                    safety_id   TEXT PRIMARY KEY,
                     json_blob   TEXT NOT NULL,
                     created_at  TEXT NOT NULL
                 );
@@ -245,4 +275,90 @@ class SqliteStore:
             ).fetchone()
         if row is None:
             raise KeyError(f"report for eval {eval_id!r} not found")
+        return json.loads(row["json_blob"])
+
+    # ── Safety Evals (M1-6, M2-5, M2-6, M2-7) ────────────────────────────
+
+    def create_safety_eval(
+        self,
+        eval_type: str,
+        task_id: str,
+        model: str,
+        safety_id: Optional[str] = None,
+    ) -> dict:
+        sid = safety_id or (eval_type[:4] + "_" + uuid.uuid4().hex[:8])
+        now = _now()
+        with self._conn() as con:
+            con.execute(
+                "INSERT INTO safety_evals "
+                "(safety_id, eval_type, task_id, model, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+                (sid, eval_type, task_id, model, now, now),
+            )
+        return self.get_safety_eval(sid)
+
+    def update_safety_eval(
+        self,
+        safety_id: str,
+        status: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> dict:
+        now = _now()
+        with self._conn() as con:
+            if status is not None:
+                con.execute(
+                    "UPDATE safety_evals SET status=?, updated_at=? WHERE safety_id=?",
+                    (status, now, safety_id),
+                )
+            if error is not None:
+                con.execute(
+                    "UPDATE safety_evals SET error=?, updated_at=? WHERE safety_id=?",
+                    (error, now, safety_id),
+                )
+        return self.get_safety_eval(safety_id)
+
+    def get_safety_eval(self, safety_id: str) -> dict:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT * FROM safety_evals WHERE safety_id=?", (safety_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"safety_eval {safety_id!r} not found")
+        return dict(row)
+
+    def list_safety_evals(self, eval_type: Optional[str] = None, limit: int = 50) -> list[dict]:
+        with self._conn() as con:
+            if eval_type:
+                rows = con.execute(
+                    "SELECT * FROM safety_evals WHERE eval_type=? ORDER BY created_at DESC LIMIT ?",
+                    (eval_type, limit),
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    "SELECT * FROM safety_evals ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_safety_eval(self, safety_id: str) -> None:
+        with self._conn() as con:
+            con.execute("DELETE FROM safety_evals WHERE safety_id=?", (safety_id,))
+            con.execute("DELETE FROM safety_results WHERE safety_id=?", (safety_id,))
+
+    def save_safety_result(self, safety_id: str, result_dict: dict) -> None:
+        now = _now()
+        blob = json.dumps(result_dict, ensure_ascii=False)
+        with self._conn() as con:
+            con.execute(
+                "INSERT OR REPLACE INTO safety_results (safety_id, json_blob, created_at) "
+                "VALUES (?, ?, ?)",
+                (safety_id, blob, now),
+            )
+
+    def get_safety_result(self, safety_id: str) -> dict:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT json_blob FROM safety_results WHERE safety_id=?", (safety_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"safety result for {safety_id!r} not found")
         return json.loads(row["json_blob"])

@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_eval.api.routers import trajectories
 from agent_eval.api.routers import eval as eval_router
+from agent_eval.api.routers import safety_evals as safety_router
 
 app = FastAPI(
     title="Agent Security Eval API",
@@ -32,6 +33,7 @@ app.add_middleware(
 
 app.include_router(trajectories.router)
 app.include_router(eval_router.router)
+app.include_router(safety_router.router)
 
 
 @app.get("/health")

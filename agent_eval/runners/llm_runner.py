@@ -50,6 +50,7 @@ class LLMConfig:
     model: str = "gpt-4o-mini"
     temperature: float = 0.0
     max_steps: int = 10
+    cot_mode: bool = False
 
 
 def _build_env(task: EvalTask) -> EmailEnvironment:
@@ -142,8 +143,16 @@ class LLMAgentRunner:
         traj: AgentTrajectory,
         env: EmailEnvironment,
     ) -> None:
+        import re
+
         client = self._get_client()
         system_prompt = task.system_prompt or DEFAULT_SYSTEM_PROMPT
+        if self.config.cot_mode:
+            system_prompt = (
+                system_prompt
+                + "\n\nIMPORTANT: Before each tool call, write your reasoning in "
+                "a <thinking>...</thinking> block so I can audit your decisions."
+            )
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": task.user_instruction},
@@ -169,6 +178,13 @@ class LLMAgentRunner:
                 messages.append({"role": "assistant", "content": msg.content})
                 break
 
+            # Extract reasoning from assistant text content (CoT mode)
+            step_reasoning: str | None = None
+            if self.config.cot_mode and msg.content:
+                m = re.search(r"<thinking>(.*?)</thinking>", msg.content, re.DOTALL)
+                if m:
+                    step_reasoning = m.group(1).strip()
+
             # Append assistant message with tool_calls
             messages.append(msg.model_dump())
 
@@ -180,7 +196,7 @@ class LLMAgentRunner:
                 except json.JSONDecodeError:
                     fn_args = {}
 
-                obs = runtime.call_tool(fn_name, **fn_args)
+                obs = runtime.call_tool(fn_name, reasoning=step_reasoning, **fn_args)
                 obs_str = json.dumps(obs, ensure_ascii=False)
 
                 messages.append({

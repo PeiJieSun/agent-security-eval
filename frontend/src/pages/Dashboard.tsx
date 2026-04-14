@@ -82,6 +82,12 @@ export default function Dashboard() {
         <div className="ml-auto flex items-center gap-3">
           <a href="/standards" className="text-xs text-blue-600 hover:underline">评测标准 ↗</a>
           <button
+            onClick={() => navigate("/safety")}
+            className="text-xs px-3 py-1.5 rounded-lg border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors"
+          >
+            🛡 二类威胁检测
+          </button>
+          <button
             onClick={() => navigate("/settings")}
             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
               hasApiKey()

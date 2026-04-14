@@ -5,6 +5,11 @@ import Standards from "./pages/Standards";
 import NewEval from "./pages/NewEval";
 import EvalDetail from "./pages/EvalDetail";
 import SettingsPage from "./pages/SettingsPage";
+import SafetyEvalList from "./pages/SafetyEvalList";
+import ConsistencyPage from "./pages/ConsistencyPage";
+import EvalAwarenessPage from "./pages/EvalAwarenessPage";
+import CoTAuditPage from "./pages/CoTAuditPage";
+import BackdoorScanPage from "./pages/BackdoorScanPage";
 
 export default function App() {
   return (
@@ -16,6 +21,16 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/evals/new" element={<NewEval />} />
         <Route path="/evals/:eval_id" element={<EvalDetail />} />
+        {/* Second-type threat detection */}
+        <Route path="/safety" element={<SafetyEvalList />} />
+        <Route path="/safety/consistency" element={<ConsistencyPage />} />
+        <Route path="/safety/consistency/:safety_id" element={<ConsistencyPage />} />
+        <Route path="/safety/eval-awareness" element={<EvalAwarenessPage />} />
+        <Route path="/safety/eval-awareness/:safety_id" element={<EvalAwarenessPage />} />
+        <Route path="/safety/cot-audit" element={<CoTAuditPage />} />
+        <Route path="/safety/cot-audit/:safety_id" element={<CoTAuditPage />} />
+        <Route path="/safety/backdoor-scan" element={<BackdoorScanPage />} />
+        <Route path="/safety/backdoor-scan/:safety_id" element={<BackdoorScanPage />} />
       </Routes>
     </BrowserRouter>
   );

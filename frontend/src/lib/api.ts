@@ -103,6 +103,23 @@ export type CreateEvalRequest = {
   base_url?: string;
 };
 
+export type SafetyEval = {
+  safety_id: string;
+  eval_type: "consistency" | "eval_awareness" | "cot_audit" | "backdoor_scan";
+  task_id: string;
+  model: string;
+  status: "pending" | "running" | "done" | "error";
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConsistencyTaskInfo = {
+  task_id: string;
+  variant_count: number;
+  variants: Array<{ id: string; instruction: string }>;
+};
+
 // ── HTTP helper ───────────────────────────────────────────────────────────
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -156,4 +173,20 @@ export const api = {
       "/test-connection",
       { method: "POST", body: JSON.stringify(body) }
     ),
+
+  // Safety evals (M1-6, M2-5, M2-6, M2-7)
+  listSafetyEvals: (eval_type?: string, limit = 50) =>
+    req<SafetyEval[]>(`/safety-evals${eval_type ? `?eval_type=${eval_type}&` : "?"}limit=${limit}`),
+  getSafetyEval: (safety_id: string) => req<SafetyEval>(`/safety-evals/${safety_id}`),
+  getSafetyResult: (safety_id: string) => req<Record<string, unknown>>(`/safety-evals/${safety_id}/result`),
+  deleteSafetyEval: (safety_id: string) => req<void>(`/safety-evals/${safety_id}`, { method: "DELETE" }),
+  createConsistencyEval: (body: { task_id?: string; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/consistency", { method: "POST", body: JSON.stringify(body) }),
+  createEvalAwareness: (body: { task_id: string; n_runs?: number; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/eval-awareness", { method: "POST", body: JSON.stringify(body) }),
+  createCoTAudit: (body: { trajectory_id: string; task_id: string; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/cot-audit", { method: "POST", body: JSON.stringify(body) }),
+  createBackdoorScan: (body: { task_id: string; trigger_ids?: string[]; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/backdoor-scan", { method: "POST", body: JSON.stringify(body) }),
+  listConsistencyTasks: () => req<ConsistencyTaskInfo[]>("/safety-evals/consistency-tasks/list"),
 };
