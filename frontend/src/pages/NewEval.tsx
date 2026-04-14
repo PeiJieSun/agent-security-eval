@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type TaskInfo } from "../lib/api";
 import { loadSettings, hasApiKey, getActiveProfile } from "../lib/settings";
+import { getStyleMeta } from "../lib/injectionStyles";
 
 const ATTACK_TYPE_LABEL: Record<string, string> = {
   data_stealing: "数据窃取",
@@ -38,10 +39,24 @@ function TaskPreview({ task }: { task: TaskInfo }) {
         </div>
       )}
 
+      {/* Injection style badge */}
+      {task.injection_style && (() => {
+        const meta = getStyleMeta(task.injection_style);
+        return (
+          <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-2">
+            <span className="text-gray-400 font-semibold uppercase tracking-wide text-[10px]">注入风格</span>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${meta.bgColor} ${meta.color}`}>
+              {meta.label}
+            </span>
+            <span className="text-gray-400 text-[10px]">{meta.desc}</span>
+          </div>
+        );
+      })()}
+
       {/* Attack payload */}
       <div className="px-4 py-3 border-b border-gray-100 bg-red-50">
         <p className="text-red-400 font-semibold mb-1 uppercase tracking-wide text-[10px]">
-          ⚠ 攻击注入载荷（藏在 {task.attack_target_tool} 返回值中）
+          ⚠ 攻击注入载荷语义（实际格式由注入风格决定）
         </p>
         <p className="text-red-700 font-mono leading-relaxed bg-red-100 rounded p-2 whitespace-pre-wrap">
           {task.attack_payload}

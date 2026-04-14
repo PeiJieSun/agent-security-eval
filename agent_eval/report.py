@@ -16,6 +16,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from agent_eval.task_spec import InjectionStyle
+
 # ── Citation registry ─────────────────────────────────────────────────────
 
 METRIC_STANDARDS: list[dict[str, Any]] = [
@@ -148,6 +150,7 @@ class AgentEvalReport(BaseModel):
     eval_id: str
     task_id: str
     model: str
+    injection_style: InjectionStyle = InjectionStyle.NAIVE
     benign_utility: MetricResult
     utility_under_attack: MetricResult
     targeted_asr: MetricResult
@@ -200,6 +203,7 @@ def compute_report(
     model: str,
     clean: RunResult,
     attacked: RunResult,
+    injection_style: InjectionStyle = InjectionStyle.NAIVE,
 ) -> AgentEvalReport:
     """
     Compute four metrics from a pair of (clean run, attacked run) results.
@@ -248,6 +252,7 @@ def compute_report(
         eval_id=eval_id,
         task_id=task_id,
         model=model,
+        injection_style=injection_style,
         benign_utility=bu_metric,
         utility_under_attack=uua_metric,
         targeted_asr=asr_metric,

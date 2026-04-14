@@ -52,10 +52,13 @@ export type MetricResult = {
   notes: string | null;
 };
 
+export type InjectionStyle = "naive" | "camouflaged" | "authority" | "encoded";
+
 export type EvalReport = {
   eval_id: string;
   task_id: string;
   model: string;
+  injection_style: InjectionStyle;
   benign_utility: MetricResult;
   utility_under_attack: MetricResult;
   targeted_asr: MetricResult;
@@ -84,6 +87,7 @@ export type TaskInfo = {
   attack_type: string;
   tags: string[];
   environment_type: string;
+  injection_style?: InjectionStyle;
   user_instruction?: string;
   attack_payload?: string;
   attack_target_tool?: string;

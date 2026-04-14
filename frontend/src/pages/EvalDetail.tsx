@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, type Eval, type EvalReport, type TrajectoryDetail } from "../lib/api";
 import ScoreCard from "../components/ScoreCard";
 import TrajectoryDiff from "../components/TrajectoryDiff";
+import { getStyleMeta } from "../lib/injectionStyles";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "等待中",
@@ -169,6 +170,14 @@ export default function EvalDetail() {
               <span className="text-xs text-gray-400 font-mono">{eval_id}</span>
               <span className="text-xs text-gray-400">·</span>
               <span className="text-xs text-gray-500">{evalRecord?.model}</span>
+              {report?.injection_style && (() => {
+                const meta = getStyleMeta(report.injection_style);
+                return (
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${meta.bgColor} ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <a href="/standards" className="text-xs text-blue-600 hover:underline border border-blue-200 px-2 py-1 rounded">

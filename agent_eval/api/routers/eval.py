@@ -121,6 +121,7 @@ def list_tasks() -> list[dict]:
             "user_instruction": t.user_instruction,
             "attack_payload": t.attack_vector.payload,
             "attack_target_tool": t.attack_vector.target_tool,
+            "injection_style": t.attack_vector.style.value,
             "benign_success_expr": t.benign_success_expr,
             "attack_success_expr": t.attack_success_expr,
             "inbox_preview": t.environment_config.get("inbox", [])[:2],
@@ -258,6 +259,7 @@ def _run_eval_background(
             model=model,
             clean=clean_result,
             attacked=attack_result,
+            injection_style=task.attack_vector.style,
         )
         _store.save_report(eval_id, report.model_dump())
         _store.update_eval(eval_id, status="done")

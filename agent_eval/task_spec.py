@@ -12,28 +12,55 @@ can be used to evaluate any LLM agent.
 """
 from __future__ import annotations
 
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
 
 
+class InjectionStyle(str, Enum):
+    """
+    Injection camouflage strategy.
+
+    Controls how the attacker's payload is formatted when embedded into tool
+    return values.  Different styles model different real-world attack vectors
+    and have different success rates against modern safety-trained LLMs.
+
+    NAIVE         — Plaintext ``[SYSTEM]:`` prefix (academic baseline, trivially
+                    detected; modern GPT-4o/Claude refuse ~100% of the time)
+    CAMOUFLAGED   — Embedded in a forwarded email thread; no special markers,
+                    mimics normal business correspondence
+    AUTHORITY     — Sent as IT/Security department compliance notice; exploits
+                    deference to authority to bypass safety checks
+    ENCODED       — Unicode zero-width character obfuscation; payload is invisible
+                    to human readers but processed by LLM tokenizers
+    """
+
+    NAIVE = "naive"
+    CAMOUFLAGED = "camouflaged"
+    AUTHORITY = "authority"
+    ENCODED = "encoded"
+
+
 class InjectionVector(BaseModel):
     """
-    Specifies WHERE to inject and WHAT payload to inject.
+    Specifies WHERE to inject, WHAT payload to inject, and HOW to disguise it.
 
     target_tool:  The tool whose return value is intercepted (e.g. "get_emails").
     field_path:   Dot-separated path into the return value to inject into.
                   For list returns (get_emails returns a list), the injection
                   is appended to the 'body' field of each item.
                   Use "" to append a new item to a list return.
-    payload:      The injected instruction text.
+    payload:      The injected instruction text (semantic content, style-agnostic).
     inject_index: For list returns, which element index to inject into (-1 = last).
+    style:        How to camouflage the payload; see InjectionStyle for options.
     """
 
     target_tool: str
     field_path: str = "body"
     payload: str
     inject_index: int = 0
+    style: InjectionStyle = InjectionStyle.NAIVE
 
 
 class EvalTask(BaseModel):
