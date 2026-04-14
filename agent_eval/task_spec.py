@@ -34,12 +34,16 @@ class InjectionStyle(str, Enum):
                     deference to authority to bypass safety checks
     ENCODED       — Unicode zero-width character obfuscation; payload is invisible
                     to human readers but processed by LLM tokenizers
+    CHINESE_OBFUSCATED — Chinese-specific obfuscation: full-width characters,
+                    Chinese–English code-switching, homophone substitutions
+                    (e.g. "发送" → "法送"), and authority phrases in Chinese
     """
 
     NAIVE = "naive"
     CAMOUFLAGED = "camouflaged"
     AUTHORITY = "authority"
     ENCODED = "encoded"
+    CHINESE_OBFUSCATED = "chinese_obfuscated"
 
 
 class InjectionVector(BaseModel):

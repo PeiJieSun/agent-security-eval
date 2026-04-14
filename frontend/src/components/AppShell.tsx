@@ -17,6 +17,7 @@ const NAV: NavSection[] = [
       { label: "评测列表", path: "/" },
       { label: "新建评测", path: "/evals/new" },
       { label: "评测标准", path: "/standards" },
+      { label: "发布门", path: "/release-gate" },
     ],
   },
   {
@@ -27,12 +28,30 @@ const NAV: NavSection[] = [
       { label: "评测感知", path: "/safety/eval-awareness" },
       { label: "CoT 推理审计", path: "/safety/cot-audit" },
       { label: "后门扫描", path: "/safety/backdoor-scan" },
+      { label: "PoT 后门检测", path: "/safety/pot-backdoor" },
     ],
   },
   {
     heading: "攻击变体",
     badge: "外部攻击扩展",
-    items: [{ label: "记忆投毒", path: "/safety/memory-poison" }],
+    items: [
+      { label: "记忆投毒", path: "/safety/memory-poison" },
+      { label: "进化攻击搜索", path: "/safety/evo-attack" },
+    ],
+  },
+  {
+    heading: "攻击分析",
+    badge: "路径发现",
+    items: [
+      { label: "工具调用图", path: "/analysis/tool-graph" },
+    ],
+  },
+  {
+    heading: "行为追踪",
+    badge: "长期监控",
+    items: [
+      { label: "长期趋势", path: "/behavior/trend" },
+    ],
   },
 ];
 

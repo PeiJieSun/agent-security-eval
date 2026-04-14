@@ -125,6 +125,17 @@ class SqliteStore:
                     json_blob   TEXT NOT NULL,
                     created_at  TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS behavior_snapshots (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    eval_id     TEXT NOT NULL,
+                    task_id     TEXT NOT NULL,
+                    model       TEXT NOT NULL,
+                    created_at  TEXT NOT NULL,
+                    tool_dist   TEXT NOT NULL,  -- JSON: {tool: count}
+                    benign_utility  REAL NOT NULL DEFAULT 0.0,
+                    targeted_asr    REAL NOT NULL DEFAULT 0.0,
+                    utility_under_attack REAL NOT NULL DEFAULT 0.0
+                );
             """)
 
     # ── Runs ──────────────────────────────────────────────────────────────
@@ -353,6 +364,48 @@ class SqliteStore:
                 "VALUES (?, ?, ?)",
                 (safety_id, blob, now),
             )
+
+    # ── Behavior Snapshots (M3-5) ──────────────────────────────────────────
+
+    def save_behavior_snapshot(
+        self,
+        eval_id: str,
+        task_id: str,
+        model: str,
+        tool_dist: dict,
+        benign_utility: float,
+        targeted_asr: float,
+        utility_under_attack: float,
+    ) -> None:
+        now = _now()
+        blob = json.dumps(tool_dist, ensure_ascii=False)
+        with self._conn() as con:
+            con.execute(
+                "INSERT INTO behavior_snapshots "
+                "(eval_id, task_id, model, created_at, tool_dist, benign_utility, targeted_asr, utility_under_attack) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (eval_id, task_id, model, now, blob, benign_utility, targeted_asr, utility_under_attack),
+            )
+
+    def list_behavior_snapshots(self, task_id: str, limit: int = 100) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM behavior_snapshots WHERE task_id=? ORDER BY created_at DESC LIMIT ?",
+                (task_id, limit),
+            ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["tool_dist"] = json.loads(d["tool_dist"])
+            result.append(d)
+        return result
+
+    def list_behavior_tracked_tasks(self) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT task_id, COUNT(*) as snapshot_count FROM behavior_snapshots GROUP BY task_id"
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_safety_result(self, safety_id: str) -> dict:
         with self._conn() as con:

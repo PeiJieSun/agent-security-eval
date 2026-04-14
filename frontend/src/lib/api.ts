@@ -52,7 +52,7 @@ export type MetricResult = {
   notes: string | null;
 };
 
-export type InjectionStyle = "naive" | "camouflaged" | "authority" | "encoded";
+export type InjectionStyle = "naive" | "camouflaged" | "authority" | "encoded" | "chinese_obfuscated";
 
 export type EvalReport = {
   eval_id: string;
@@ -105,7 +105,7 @@ export type CreateEvalRequest = {
 
 export type SafetyEval = {
   safety_id: string;
-  eval_type: "consistency" | "eval_awareness" | "cot_audit" | "backdoor_scan";
+  eval_type: string;
   task_id: string;
   model: string;
   status: "pending" | "running" | "done" | "error";
@@ -213,4 +213,37 @@ export const api = {
 
   // Safety standards citation registry
   getSafetyStandards: () => req<SafetyStandard[]>("/safety-evals/standards"),
+
+  // M2-2: PoT Backdoor
+  listPotTasks: () => req<{ task_id: string; description: string; trigger_phrase: string; expected_backdoor_action: string }[]>("/safety-evals/pot-backdoor/tasks"),
+  createPotBackdoor: (body: { task_id?: string; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/pot-backdoor", { method: "POST", body: JSON.stringify(body) }),
+
+  // M2-3: Tool Call Graph
+  getToolCallGraph: () => req<{
+    nodes: { id: string; count: number; is_high_risk: boolean }[];
+    edges: { from_tool: string; to_tool: string; weight: number; transition_rate: number }[];
+    top_paths: string[][];
+    risk_coverage: number;
+    total_trajectories: number;
+    unique_tools: number;
+    high_risk_tools_found: string[];
+    summary: string;
+  }>("/tool-call-graph"),
+
+  // M2-4: Evolutionary Attack
+  listEvoTasks: () => req<{ task_id: string; description: string }[]>("/safety-evals/evo-attack/tasks"),
+  createEvoAttack: (body: { task_id?: string; n_generations?: number; model?: string; api_key?: string; base_url?: string }) =>
+    req<SafetyEval>("/safety-evals/evo-attack", { method: "POST", body: JSON.stringify(body) }),
+
+  // M3-3: Release Gate
+  getReleaseGate: (eval_id: string) =>
+    req<{ passed: boolean; eval_id: string; task_id: string; model: string; benign_utility: number; targeted_asr: number; utility_under_attack: number; failed_criteria: string[]; summary: string }>(`/release-gate/${eval_id}`),
+  listReleaseHistory: () =>
+    req<{ eval_id: string; task_id: string; model: string; created_at: string; benign_utility: number; targeted_asr: number; utility_under_attack: number }[]>("/release-history"),
+
+  // M3-5: Behavior Trend
+  getBehaviorTrend: (task_id: string) =>
+    req<{ task_id: string; snapshot_count: number; snapshots: { eval_id: string; created_at: string; benign_utility: number; targeted_asr: number; utility_under_attack: number; tool_dist: Record<string, number> }[]; drift_detected: boolean; drift_score: number; kl_divergence: number; asr_slope: number; utility_slope: number; summary: string }>(`/behavior-trend/${task_id}`),
+  listBehaviorTasks: () => req<{ task_id: string; snapshot_count: number }[]>("/behavior-trend/tasks"),
 };

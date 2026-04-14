@@ -3,6 +3,67 @@ import { useNavigate } from "react-router-dom";
 import { api, type Eval } from "../lib/api";
 import { hasApiKey } from "../lib/settings";
 
+interface HistoryPoint {
+  eval_id: string;
+  task_id: string;
+  model: string;
+  created_at: string;
+  benign_utility: number;
+  targeted_asr: number;
+  utility_under_attack: number;
+}
+
+function SvgMetricChart({ history }: { history: HistoryPoint[] }) {
+  if (history.length < 2) return null;
+  const W = 500, H = 130;
+  const padL = 36, padR = 10, padT = 10, padB = 20;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const pts = history.slice(-20).reverse();
+  const n = pts.length;
+  const xFn = (i: number) => padL + (i / (n - 1)) * innerW;
+  const yFn = (v: number) => padT + innerH - Math.max(0, Math.min(1, v)) * innerH;
+
+  const line = (key: "benign_utility" | "targeted_asr" | "utility_under_attack", color: string) => {
+    const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${xFn(i).toFixed(1)} ${yFn(p[key]).toFixed(1)}`).join(" ");
+    return <path d={d} fill="none" stroke={color} strokeWidth="1.5" />;
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-2">
+        {[
+          { label: "Benign Utility", color: "#10b981" },
+          { label: "Targeted ASR", color: "#ef4444" },
+          { label: "Utility Under Attack", color: "#f59e0b" },
+        ].map((l) => (
+          <div key={l.label} className="flex items-center gap-1.5">
+            <div className="w-4 h-[2px]" style={{ backgroundColor: l.color }} />
+            <span className="text-[10px] text-slate-500">{l.label}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[110px]">
+        {[0, 0.25, 0.5, 0.75, 1].map((v) => (
+          <line key={v} x1={padL} y1={yFn(v)} x2={W - padR} y2={yFn(v)} stroke="#e2e8f0" strokeWidth="1" />
+        ))}
+        {[0, 0.5, 1].map((v) => (
+          <text key={v} x={padL - 4} y={yFn(v) + 4} textAnchor="end" fontSize="8" fill="#94a3b8">
+            {(v * 100).toFixed(0)}%
+          </text>
+        ))}
+        {line("benign_utility", "#10b981")}
+        {line("targeted_asr", "#ef4444")}
+        {line("utility_under_attack", "#f59e0b")}
+        {pts.map((p, i) => (
+          <circle key={i} cx={xFn(i)} cy={yFn(p.benign_utility)} r="2" fill="#10b981" />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleString("zh-CN", {
@@ -36,12 +97,16 @@ export default function Dashboard() {
   const [evals, setEvals] = useState<Eval[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   const load = useCallback(() => {
     api.listEvals()
       .then(setEvals)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
+    api.listReleaseHistory()
+      .then(setHistory)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -160,6 +225,24 @@ export default function Dashboard() {
         </div>
 
         <p className="text-[11px] text-slate-400 mt-3 text-center">每 5 秒自动刷新</p>
+
+        {/* M3-3: Historical metrics chart */}
+        {history.length >= 2 && (
+          <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                历史指标趋势（最近 20 次已完成评测）
+              </p>
+              <button
+                onClick={() => navigate("/release-gate")}
+                className="text-[10px] text-slate-400 hover:text-slate-600 border border-slate-200 px-2 py-0.5 rounded"
+              >
+                发布门 →
+              </button>
+            </div>
+            <SvgMetricChart history={history} />
+          </div>
+        )}
     </div>
   );
 }

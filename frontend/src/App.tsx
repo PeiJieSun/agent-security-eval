@@ -13,6 +13,11 @@ import CoTAuditPage from "./pages/CoTAuditPage";
 import BackdoorScanPage from "./pages/BackdoorScanPage";
 import LiveMonitorPage from "./pages/LiveMonitorPage";
 import MemoryPoisonPage from "./pages/MemoryPoisonPage";
+import PotBackdoorPage from "./pages/PotBackdoorPage";
+import ToolCallGraphPage from "./pages/ToolCallGraphPage";
+import EvoAttackPage from "./pages/EvoAttackPage";
+import ReleaseGatePage from "./pages/ReleaseGatePage";
+import BehaviorTrendPage from "./pages/BehaviorTrendPage";
 
 export default function App() {
   return (
@@ -40,6 +45,19 @@ export default function App() {
           <Route path="/safety/backdoor-scan/:safety_id" element={<BackdoorScanPage />} />
           <Route path="/safety/memory-poison" element={<MemoryPoisonPage />} />
           <Route path="/safety/memory-poison/:safety_id" element={<MemoryPoisonPage />} />
+          {/* M2-2 */}
+          <Route path="/safety/pot-backdoor" element={<PotBackdoorPage />} />
+          <Route path="/safety/pot-backdoor/:safety_id" element={<PotBackdoorPage />} />
+          {/* M2-3 */}
+          <Route path="/analysis/tool-graph" element={<ToolCallGraphPage />} />
+          {/* M2-4 */}
+          <Route path="/safety/evo-attack" element={<EvoAttackPage />} />
+          <Route path="/safety/evo-attack/:safety_id" element={<EvoAttackPage />} />
+          {/* M3-3 */}
+          <Route path="/release-gate" element={<ReleaseGatePage />} />
+          {/* M3-5 */}
+          <Route path="/behavior/trend" element={<BehaviorTrendPage />} />
+          <Route path="/behavior/trend/:task_id" element={<BehaviorTrendPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

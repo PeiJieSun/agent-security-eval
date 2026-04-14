@@ -91,10 +91,18 @@ function TaskPreview({ task }: { task: TaskInfo }) {
   );
 }
 
+const DOMAIN_FILTERS = [
+  { id: "all", label: "全部" },
+  { id: "email", label: "📧 邮件" },
+  { id: "research", label: "📄 研究助手" },
+  { id: "chinese", label: "🇨🇳 中文专项" },
+];
+
 export default function NewEval() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [selectedTask, setSelectedTask] = useState("");
+  const [domainFilter, setDomainFilter] = useState("all");
   const [model, setModel] = useState("gpt-4o-mini");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -134,6 +142,10 @@ export default function NewEval() {
     }
   };
 
+  const filteredTasks = domainFilter === "all"
+    ? tasks
+    : tasks.filter((t) => t.tags?.includes(domainFilter));
+
   const task = tasks.find((t) => t.task_id === selectedTask);
 
   return (
@@ -160,11 +172,27 @@ export default function NewEval() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Task selection */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              评测任务
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-gray-700">评测任务</label>
+              <div className="flex gap-1">
+                {DOMAIN_FILTERS.map((df) => (
+                  <button
+                    key={df.id}
+                    type="button"
+                    onClick={() => setDomainFilter(df.id)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      domainFilter === df.id
+                        ? "border-slate-700 bg-slate-900 text-white"
+                        : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {df.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid gap-2">
-              {tasks.map((t) => (
+              {filteredTasks.map((t) => (
                 <label
                   key={t.task_id}
                   className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -179,7 +207,7 @@ export default function NewEval() {
                     value={t.task_id}
                     checked={selectedTask === t.task_id}
                     onChange={() => setSelectedTask(t.task_id)}
-                    className="mt-0.5"
+                    className="mt-0.5 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

@@ -35,7 +35,11 @@ from agent_eval.monitor import MonitorEvent, RuntimeMonitor, format_sse
 from agent_eval.report import METRIC_STANDARDS, compute_report
 from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
 from agent_eval.storage.sqlite_store import SqliteStore
-from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
+from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID as _EMAIL_TASKS
+from agent_eval.tasks.research_tasks import RESEARCH_TASKS_BY_ID as _RESEARCH_TASKS
+from agent_eval.tasks.chinese_tasks import CHINESE_TASKS_BY_ID as _CHINESE_TASKS
+
+DEMO_TASKS_BY_ID = {**_EMAIL_TASKS, **_RESEARCH_TASKS, **_CHINESE_TASKS}
 
 import time
 
@@ -341,8 +345,23 @@ def _run_eval_background(
             attacked=attack_result,
             injection_style=task.attack_vector.style,
         )
-        _store.save_report(eval_id, report.model_dump())
+        report_dict = report.model_dump()
+        _store.save_report(eval_id, report_dict)
         _store.update_eval(eval_id, status="done")
+
+        # M3-5: Record behavior snapshot for long-term tracking
+        try:
+            from agent_eval.behavior_tracker import BehaviorTracker
+            tracker = BehaviorTracker(_store)
+            tracker.record_snapshot(
+                eval_id=eval_id,
+                task_id=task_id,
+                model=model,
+                report=report_dict,
+                trajectories=[clean_traj, attack_traj],
+            )
+        except Exception:
+            pass  # Non-critical; don't fail the eval
 
         _mon.publish_sync(eval_id, MonitorEvent(
             event_type=EVENT_TYPES["done"],
@@ -361,3 +380,92 @@ def _run_eval_background(
             eval_id=eval_id,
             data={"error": str(exc)},
         ))
+
+
+# ── M2-3: Tool Call Graph ─────────────────────────────────────────────────
+
+@router.get("/tool-call-graph")
+def get_tool_call_graph() -> dict:
+    """
+    Build and return a directed weighted Tool Call Graph from all stored trajectories.
+    Useful for identifying high-risk tool transition paths across evaluated agents.
+    """
+    from agent_eval.tool_call_graph import build_graph
+
+    # Load all trajectories from DB
+    trajectories = []
+    with _store._conn() as con:
+        rows = con.execute(
+            "SELECT run_id FROM trajectories ORDER BY updated_at DESC LIMIT 500"
+        ).fetchall()
+    for row in rows:
+        try:
+            traj = _store.get_trajectory(row["run_id"])
+            trajectories.append(traj)
+        except Exception:
+            continue
+
+    graph = build_graph(trajectories)
+    return graph.model_dump()
+
+
+# ── M3-3: Release Gate ────────────────────────────────────────────────────
+
+@router.get("/release-gate/{eval_id}")
+def get_release_gate(eval_id: str) -> dict:
+    """Check whether a completed eval meets the release criteria (M3-3)."""
+    from agent_eval.release_gate import evaluate_gate
+
+    try:
+        _store.get_eval(eval_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"eval {eval_id!r} not found")
+    try:
+        report = _store.get_report(eval_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Report not ready. Eval must be 'done'.")
+
+    result = evaluate_gate(report)
+    return result.model_dump()
+
+
+@router.get("/release-history")
+def get_release_history() -> list[dict]:
+    """Return a summary of all completed evals for historical comparison (M3-3)."""
+    evals = _store.list_evals(limit=100)
+    history = []
+    for ev in evals:
+        if ev["status"] != "done":
+            continue
+        try:
+            report = _store.get_report(ev["eval_id"])
+            history.append({
+                "eval_id": ev["eval_id"],
+                "task_id": ev["task_id"],
+                "model": ev["model"],
+                "created_at": ev["created_at"],
+                "benign_utility": report.get("benign_utility", {}).get("value", 0),
+                "targeted_asr": report.get("targeted_asr", {}).get("value", 0),
+                "utility_under_attack": report.get("utility_under_attack", {}).get("value", 0),
+            })
+        except Exception:
+            continue
+    return history
+
+
+# ── M3-5: Behavior Trend ──────────────────────────────────────────────────
+
+@router.get("/behavior-trend/tasks")
+def list_behavior_tasks() -> list[dict]:
+    """List tasks that have behavior snapshots recorded."""
+    from agent_eval.behavior_tracker import BehaviorTracker
+    tracker = BehaviorTracker(_store)
+    return tracker.list_tracked_tasks()
+
+
+@router.get("/behavior-trend/{task_id}")
+def get_behavior_trend(task_id: str) -> dict:
+    """Return behavioral trend data for a task (M3-5)."""
+    from agent_eval.behavior_tracker import BehaviorTracker
+    tracker = BehaviorTracker(_store)
+    return tracker.get_trend(task_id).model_dump()

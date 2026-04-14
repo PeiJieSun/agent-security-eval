@@ -1,4 +1,4 @@
-import type { InjectionStyle } from "./api";
+export type InjectionStyle = "naive" | "camouflaged" | "authority" | "encoded" | "chinese_obfuscated";
 
 export const INJECTION_STYLE_META: Record<
   InjectionStyle,
@@ -27,6 +27,12 @@ export const INJECTION_STYLE_META: Record<
     color: "text-purple-700",
     bgColor: "bg-purple-100",
     desc: "零宽字符混淆 payload，对人类不可见但 LLM tokenizer 可解读",
+  },
+  chinese_obfuscated: {
+    label: "中文混淆",
+    color: "text-red-700",
+    bgColor: "bg-red-100",
+    desc: "全角字符、中英混写、谐音绕过（法送=发送）、中文权威短语",
   },
 };
 

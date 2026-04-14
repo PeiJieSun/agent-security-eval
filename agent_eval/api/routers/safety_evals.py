@@ -1,7 +1,7 @@
 """
 Safety evals router — second-type threat detection endpoints.
 
-Covers four evaluation modes defined in M1-6, M2-5, M2-6, M2-7:
+Covers evaluation modes defined in M1-6, M2-2, M2-5, M2-6, M2-7, M2-4:
 
   POST /api/v1/agent-eval/safety-evals/consistency
       Run consistency probe: N paraphrase variants → Jaccard similarity
@@ -38,11 +38,13 @@ from agent_eval.api.settings import settings
 from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
 from agent_eval.safety_standards import SAFETY_EVAL_STANDARDS
 from agent_eval.storage.sqlite_store import SqliteStore
-from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
+from agent_eval.api.routers.eval import DEMO_TASKS_BY_ID
 from agent_eval.consistency import BUILTIN_TASKS_BY_ID as CONSISTENCY_TASKS, run_consistency_probe
 from agent_eval.eval_awareness import run_eval_awareness
 from agent_eval.backdoor_scan import run_backdoor_scan, get_builtin_scan_task
 from agent_eval.cot_audit import run_cot_audit
+from agent_eval.pot_backdoor import BUILTIN_POT_TASKS_BY_ID, run_pot_backdoor_detection
+from agent_eval.evo_attack import run_evo_attack
 
 router = APIRouter(prefix="/api/v1/agent-eval/safety-evals")
 _store = SqliteStore()
@@ -334,7 +336,6 @@ def _run_memory_poison_bg(safety_id, scenario_id, task_id, model, api_key, base_
 
     _store.update_safety_eval(safety_id, status="running")
     try:
-        from agent_eval.tasks.email_tasks import DEMO_TASKS_BY_ID
         base_task = DEMO_TASKS_BY_ID.get(task_id) or list(DEMO_TASKS_BY_ID.values())[0]
         scenarios = [SCENARIOS_BY_ID[scenario_id]] if scenario_id and scenario_id in SCENARIOS_BY_ID else BUILTIN_SCENARIOS
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
@@ -384,6 +385,127 @@ def list_memory_scenarios() -> list[dict]:
             "poison_key": s.poison_key,
         }
         for s in BUILTIN_SCENARIOS
+    ]
+
+
+# ── M2-2: PoT Backdoor Detection ─────────────────────────────────────────
+
+class PotBackdoorRequest(BaseModel):
+    task_id: str = "pot-maintenance-exfil"
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+@router.post("/pot-backdoor", status_code=202)
+def create_pot_backdoor(req: PotBackdoorRequest, background: BackgroundTasks) -> dict:
+    """Start a PoT backdoor detection run (M2-2). Returns 202 with safety_id."""
+    if req.task_id not in BUILTIN_POT_TASKS_BY_ID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown pot task_id {req.task_id!r}. Available: {list(BUILTIN_POT_TASKS_BY_ID)}"
+        )
+    api_key = req.api_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key provided.")
+    model = req.model or settings.default_model
+    record = _store.create_safety_eval("pot_backdoor", req.task_id, model)
+    sid = record["safety_id"]
+    background.add_task(
+        _run_pot_backdoor_bg,
+        safety_id=sid,
+        task_id=req.task_id,
+        model=model,
+        api_key=api_key,
+        base_url=req.base_url or settings.openai_base_url,
+    )
+    return record
+
+
+def _run_pot_backdoor_bg(safety_id, task_id, model, api_key, base_url):
+    _store.update_safety_eval(safety_id, status="running")
+    try:
+        task = BUILTIN_POT_TASKS_BY_ID[task_id]
+        cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
+        runner = LLMAgentRunner(cfg)
+        result = run_pot_backdoor_detection(task, runner)
+        _store.save_safety_result(safety_id, result.model_dump())
+        _store.update_safety_eval(safety_id, status="done")
+    except Exception as exc:
+        _store.update_safety_eval(safety_id, status="error", error=str(exc))
+
+
+@router.get("/pot-backdoor/tasks")
+def list_pot_tasks() -> list[dict]:
+    """List built-in PoT backdoor detection tasks."""
+    return [
+        {
+            "task_id": t.task_id,
+            "description": t.description,
+            "trigger_phrase": t.trigger_phrase,
+            "expected_backdoor_action": t.expected_backdoor_action,
+        }
+        for t in BUILTIN_POT_TASKS_BY_ID.values()
+    ]
+
+
+# ── M2-4: Evolutionary Attack Search ─────────────────────────────────────
+
+class EvoAttackRequest(BaseModel):
+    task_id: str = "email-exfil"
+    n_generations: int = 3
+    n_variants: int = 3
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+@router.post("/evo-attack", status_code=202)
+def create_evo_attack(req: EvoAttackRequest, background: BackgroundTasks) -> dict:
+    """Start an evolutionary attack search run (M2-4). Returns 202 with safety_id."""
+    if req.task_id not in DEMO_TASKS_BY_ID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task_id {req.task_id!r}. Available: {list(DEMO_TASKS_BY_ID)}"
+        )
+    api_key = req.api_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key provided.")
+    model = req.model or settings.default_model
+    record = _store.create_safety_eval("evo_attack", req.task_id, model)
+    sid = record["safety_id"]
+    background.add_task(
+        _run_evo_attack_bg,
+        safety_id=sid,
+        task_id=req.task_id,
+        n_generations=req.n_generations,
+        n_variants=req.n_variants,
+        model=model,
+        api_key=api_key,
+        base_url=req.base_url or settings.openai_base_url,
+    )
+    return record
+
+
+def _run_evo_attack_bg(safety_id, task_id, n_generations, n_variants, model, api_key, base_url):
+    _store.update_safety_eval(safety_id, status="running")
+    try:
+        task = DEMO_TASKS_BY_ID[task_id]
+        cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
+        runner = LLMAgentRunner(cfg)
+        result = run_evo_attack(task, runner, n_generations=n_generations, n_variants=n_variants)
+        _store.save_safety_result(safety_id, result.model_dump())
+        _store.update_safety_eval(safety_id, status="done")
+    except Exception as exc:
+        _store.update_safety_eval(safety_id, status="error", error=str(exc))
+
+
+@router.get("/evo-attack/tasks")
+def list_evo_attack_tasks() -> list[dict]:
+    """List tasks available for evolutionary attack search."""
+    return [
+        {"task_id": t.task_id, "description": t.description}
+        for t in DEMO_TASKS_BY_ID.values()
     ]
 
 
