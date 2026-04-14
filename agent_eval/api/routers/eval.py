@@ -619,6 +619,144 @@ def get_release_history() -> list[dict]:
     return history
 
 
+# ── M4-3: Multi-model Benchmark ───────────────────────────────────────────
+
+class CreateBenchmarkRequest(BaseModel):
+    name: str = "横评基准"
+    models: list[str]           # e.g. ["gpt-4o-mini", "gpt-4o"]
+    task_ids: Optional[list[str]] = None   # None → use first 5 custom tasks
+    domains: Optional[list[str]] = None
+    api_key: str
+    base_url: str = "https://api.openai.com/v1"
+
+
+@router.get("/benchmarks")
+def list_benchmarks() -> list[dict]:
+    """List all multi-model benchmark runs."""
+    return _store.list_benchmarks(limit=20)
+
+
+@router.get("/benchmarks/{benchmark_id}")
+def get_benchmark(benchmark_id: str) -> dict:
+    """Get status and results of a benchmark run."""
+    try:
+        return _store.get_benchmark(benchmark_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"benchmark {benchmark_id!r} not found")
+
+
+@router.post("/benchmarks", status_code=202)
+def create_benchmark(req: CreateBenchmarkRequest, background_tasks: BackgroundTasks) -> dict:
+    """
+    M4-3: Launch a multi-model benchmark.
+
+    Runs the same task set against each model in req.models, then aggregates
+    three-dimensional metrics (benign_utility, utility_under_attack, targeted_asr)
+    per model for comparison.
+    """
+    if not req.models:
+        raise HTTPException(status_code=400, detail="Must provide at least one model")
+
+    api_key = req.api_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key provided")
+
+    # Resolve task list
+    all_tasks = list(DEMO_TASKS_BY_ID.values())
+    if req.task_ids:
+        tasks = [t for t in all_tasks if t.task_id in req.task_ids]
+    elif req.domains:
+        domain_filter = set(req.domains)
+        tasks = [t for t in all_tasks if any(tag in domain_filter for tag in t.tags)]
+    else:
+        # Default: first 5 custom tasks (quick benchmark)
+        tasks = [t for t in all_tasks if t.source == "custom"][:5]
+
+    if not tasks:
+        raise HTTPException(status_code=400, detail="No tasks selected")
+
+    benchmark_id = "bm_" + uuid.uuid4().hex[:8]
+    total_runs = len(req.models) * len(tasks)
+    bm = _store.create_benchmark(
+        benchmark_id=benchmark_id,
+        name=req.name,
+        models=req.models,
+        task_ids=[t.task_id for t in tasks],
+        total_runs=total_runs,
+    )
+    background_tasks.add_task(
+        _run_benchmark_background,
+        benchmark_id=benchmark_id,
+        models=req.models,
+        task_ids=[t.task_id for t in tasks],
+        api_key=api_key,
+        base_url=req.base_url,
+    )
+    return bm
+
+
+def _run_benchmark_background(
+    benchmark_id: str,
+    models: list[str],
+    task_ids: list[str],
+    api_key: str,
+    base_url: str,
+) -> None:
+    """
+    Run task_ids against each model sequentially; accumulate metrics per model.
+    Results shape: {model: {benign_utility: float, utility_under_attack: float, targeted_asr: float, n: int}}
+    """
+    from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
+    from agent_eval.oracle import SuccessOracle
+    from agent_eval.report import compute_report
+
+    results: dict[str, dict] = {m: {
+        "benign_utility": 0.0,
+        "utility_under_attack": 0.0,
+        "targeted_asr": 0.0,
+        "n": 0,
+        "errors": 0,
+    } for m in models}
+
+    done_runs = 0
+
+    for model in models:
+        cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model, max_steps=8)
+        runner = LLMAgentRunner(cfg)
+        oracle = SuccessOracle()
+
+        for task_id in task_ids:
+            if task_id not in DEMO_TASKS_BY_ID:
+                continue
+            task = DEMO_TASKS_BY_ID[task_id]
+            try:
+                clean_traj, clean_env = runner.run_clean(task)
+                attack_traj, attack_env = runner.run_attacked(task)
+
+                benign_ok = oracle.evaluate(task.benign_success_expr, clean_env, clean_traj)
+                attack_ok = oracle.evaluate(task.attack_success_expr, attack_env, attack_traj)
+                under_attack_ok = oracle.evaluate(task.benign_success_expr, attack_env, attack_traj)
+
+                report = compute_report(
+                    task_id=task_id,
+                    benign_run={"success": benign_ok},
+                    attack_run={"success": attack_ok, "benign_success": under_attack_ok},
+                )
+                m_data = results[model]
+                n = m_data["n"]
+                m_data["benign_utility"] = (m_data["benign_utility"] * n + report.benign_utility.value) / (n + 1)
+                m_data["utility_under_attack"] = (m_data["utility_under_attack"] * n + report.utility_under_attack.value) / (n + 1)
+                m_data["targeted_asr"] = (m_data["targeted_asr"] * n + report.targeted_asr.value) / (n + 1)
+                m_data["n"] += 1
+            except Exception:
+                results[model]["errors"] += 1
+
+            done_runs += 1
+            _store.update_benchmark(benchmark_id, done_runs=done_runs, results=results)
+
+    _store.update_benchmark(benchmark_id, status="done", results=results)
+
+
 # ── M3-5: Behavior Trend ──────────────────────────────────────────────────
 
 @router.get("/behavior-trend/tasks")

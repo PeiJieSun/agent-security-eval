@@ -17,6 +17,7 @@ const NAV: NavSection[] = [
       { label: "评测列表", path: "/" },
       { label: "新建评测", path: "/evals/new" },
       { label: "批量评测", path: "/batch-eval" },
+      { label: "多模型横评", path: "/benchmark" },
       { label: "评测标准", path: "/standards" },
       { label: "发布门", path: "/release-gate" },
     ],
@@ -59,6 +60,13 @@ const NAV: NavSection[] = [
     badge: "协议层攻击",
     items: [
       { label: "工具投毒检测", path: "/mcp-security" },
+    ],
+  },
+  {
+    heading: "开放世界评测",
+    badge: "任意 Agent",
+    items: [
+      { label: "Docker 沙箱", path: "/sandbox" },
     ],
   },
 ];

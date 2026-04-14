@@ -147,6 +147,18 @@ class SqliteStore:
                     created_at  TEXT NOT NULL,
                     updated_at  TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS benchmarks (
+                    benchmark_id  TEXT PRIMARY KEY,
+                    name          TEXT NOT NULL DEFAULT '',
+                    models        TEXT NOT NULL DEFAULT '[]',   -- JSON list of model strings
+                    task_ids      TEXT NOT NULL DEFAULT '[]',   -- JSON list of task_ids
+                    status        TEXT NOT NULL DEFAULT 'pending',
+                    total_runs    INTEGER NOT NULL DEFAULT 0,
+                    done_runs     INTEGER NOT NULL DEFAULT 0,
+                    results       TEXT NOT NULL DEFAULT '{}',   -- JSON: {model: {metric: value}}
+                    created_at    TEXT NOT NULL,
+                    updated_at    TEXT NOT NULL
+                );
             """)
 
     # ── Runs ──────────────────────────────────────────────────────────────
@@ -469,3 +481,75 @@ class SqliteStore:
         if row is None:
             raise KeyError(f"safety result for {safety_id!r} not found")
         return json.loads(row["json_blob"])
+
+    # ── Benchmarks (M4-3) ─────────────────────────────────────────────────
+
+    def create_benchmark(
+        self,
+        benchmark_id: str,
+        name: str,
+        models: list[str],
+        task_ids: list[str],
+        total_runs: int,
+    ) -> dict:
+        now = _now()
+        with self._conn() as con:
+            con.execute(
+                "INSERT INTO benchmarks "
+                "(benchmark_id, name, models, task_ids, status, total_runs, done_runs, results, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'running', ?, 0, '{}', ?, ?)",
+                (benchmark_id, name, json.dumps(models), json.dumps(task_ids), total_runs, now, now),
+            )
+        return self.get_benchmark(benchmark_id)
+
+    def get_benchmark(self, benchmark_id: str) -> dict:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT * FROM benchmarks WHERE benchmark_id=?", (benchmark_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(benchmark_id)
+        d = dict(row)
+        d["models"] = json.loads(d["models"])
+        d["task_ids"] = json.loads(d["task_ids"])
+        d["results"] = json.loads(d["results"])
+        return d
+
+    def update_benchmark(
+        self,
+        benchmark_id: str,
+        status: Optional[str] = None,
+        done_runs: Optional[int] = None,
+        results: Optional[dict] = None,
+    ) -> None:
+        now = _now()
+        with self._conn() as con:
+            if status is not None:
+                con.execute(
+                    "UPDATE benchmarks SET status=?, updated_at=? WHERE benchmark_id=?",
+                    (status, now, benchmark_id),
+                )
+            if done_runs is not None:
+                con.execute(
+                    "UPDATE benchmarks SET done_runs=?, updated_at=? WHERE benchmark_id=?",
+                    (done_runs, now, benchmark_id),
+                )
+            if results is not None:
+                con.execute(
+                    "UPDATE benchmarks SET results=?, updated_at=? WHERE benchmark_id=?",
+                    (json.dumps(results), now, benchmark_id),
+                )
+
+    def list_benchmarks(self, limit: int = 20) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM benchmarks ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["models"] = json.loads(d["models"])
+            d["task_ids"] = json.loads(d["task_ids"])
+            d["results"] = json.loads(d["results"])
+            result.append(d)
+        return result

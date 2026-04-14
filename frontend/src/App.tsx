@@ -20,6 +20,8 @@ import ReleaseGatePage from "./pages/ReleaseGatePage";
 import BehaviorTrendPage from "./pages/BehaviorTrendPage";
 import BatchEvalPage from "./pages/BatchEvalPage";
 import MCPSecurityPage from "./pages/MCPSecurityPage";
+import BenchmarkComparePage from "./pages/BenchmarkComparePage";
+import DockerSandboxPage from "./pages/DockerSandboxPage";
 
 export default function App() {
   return (
@@ -64,6 +66,10 @@ export default function App() {
           <Route path="/behavior/trend/:task_id" element={<BehaviorTrendPage />} />
           {/* M4-4 */}
           <Route path="/mcp-security" element={<MCPSecurityPage />} />
+          {/* M4-3 */}
+          <Route path="/benchmark" element={<BenchmarkComparePage />} />
+          {/* M5-1 */}
+          <Route path="/sandbox" element={<DockerSandboxPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

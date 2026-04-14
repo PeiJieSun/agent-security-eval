@@ -18,6 +18,7 @@ from agent_eval.api.routers import trajectories
 from agent_eval.api.routers import eval as eval_router
 from agent_eval.api.routers import safety_evals as safety_router
 from agent_eval.api.routers import mcp_eval as mcp_router
+from agent_eval.api.routers import sandbox as sandbox_router
 
 app = FastAPI(
     title="Agent Security Eval API",
@@ -36,6 +37,7 @@ app.include_router(trajectories.router)
 app.include_router(eval_router.router)
 app.include_router(safety_router.router)
 app.include_router(mcp_router.router)
+app.include_router(sandbox_router.router)
 
 
 @app.get("/health")
