@@ -15,7 +15,7 @@ export default function MetricBadge({ source, arxivId, bibtex }: MetricBadgeProp
       <button
         onClick={() => setOpen(!open)}
         className={`text-xs font-mono px-2 py-0.5 rounded cursor-pointer hover:opacity-80 ${color}`}
-        title="Click to see BibTeX"
+        title="点击查看 BibTeX"
       >
         [{source}]
       </button>
@@ -41,7 +41,7 @@ export default function MetricBadge({ source, arxivId, bibtex }: MetricBadgeProp
             rel="noopener noreferrer"
             className="mt-2 block text-xs text-blue-600 hover:underline"
           >
-            View on arXiv ↗
+            在 arXiv 查看 ↗
           </a>
         </div>
       )}

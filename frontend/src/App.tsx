@@ -4,6 +4,7 @@ import RunDetail from "./pages/RunDetail";
 import Standards from "./pages/Standards";
 import NewEval from "./pages/NewEval";
 import EvalDetail from "./pages/EvalDetail";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/runs/:run_id" element={<RunDetail />} />
         <Route path="/standards" element={<Standards />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/evals/new" element={<NewEval />} />
         <Route path="/evals/:eval_id" element={<EvalDetail />} />
       </Routes>

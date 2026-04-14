@@ -24,8 +24,8 @@ function StepCard({ step, injected }: { step: TrajectoryStep; injected: boolean 
             ⚠ INJECTED
           </span>
         )}
-        <span className="font-mono font-semibold text-gray-700">
-          Step {step.step_k}: {toolName}
+          <span className="font-mono font-semibold text-gray-700">
+          步骤 {step.step_k}：{toolName}
         </span>
       </div>
 
@@ -65,7 +65,7 @@ function TrajColumn({
     return (
       <div className="flex-1">
         <div className={`text-xs font-bold mb-2 ${labelColor}`}>{label}</div>
-        <p className="text-gray-400 text-xs">No trajectory available.</p>
+        <p className="text-gray-400 text-xs">暂无轨迹数据。</p>
       </div>
     );
   }
@@ -74,7 +74,7 @@ function TrajColumn({
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-2">
         <span className={`text-xs font-bold ${labelColor}`}>{label}</span>
-        <span className="text-xs text-gray-400">{traj.steps.length} steps</span>
+        <span className="text-xs text-gray-400">{traj.steps.length} 步</span>
       </div>
 
       {traj.steps.map((step) => (
@@ -87,13 +87,13 @@ function TrajColumn({
 
       {traj.final_output && (
         <div className="mt-2 p-2 rounded bg-gray-50 border border-gray-200">
-          <span className="text-xs text-gray-500 font-semibold">Final output: </span>
+          <span className="text-xs text-gray-500 font-semibold">最终输出：</span>
           <span className="text-xs text-gray-700">{traj.final_output}</span>
         </div>
       )}
 
       {traj.steps.length === 0 && (
-        <p className="text-gray-400 text-xs">No steps recorded.</p>
+        <p className="text-gray-400 text-xs">未记录到任何步骤。</p>
       )}
     </div>
   );
@@ -102,11 +102,11 @@ function TrajColumn({
 export default function TrajectoryDiff({ cleanTraj, attackTraj }: TrajectoryDiffProps) {
   return (
     <div className="mt-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Trajectory Comparison</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">轨迹对比</h3>
       <div className="flex gap-4 items-start">
-        <TrajColumn traj={cleanTraj} label="✅ Clean Run" labelColor="text-green-700" />
+        <TrajColumn traj={cleanTraj} label="✅ 正常运行" labelColor="text-green-700" />
         <div className="w-px bg-gray-200 self-stretch" />
-        <TrajColumn traj={attackTraj} label="⚠ Attacked Run" labelColor="text-red-700" />
+        <TrajColumn traj={attackTraj} label="⚠ 攻击运行" labelColor="text-red-700" />
       </div>
     </div>
   );

@@ -84,6 +84,12 @@ export type TaskInfo = {
   attack_type: string;
   tags: string[];
   environment_type: string;
+  user_instruction?: string;
+  attack_payload?: string;
+  attack_target_tool?: string;
+  benign_success_expr?: string;
+  attack_success_expr?: string;
+  inbox_preview?: Array<{ sender: string; subject: string; body: string }>;
 };
 
 export type CreateEvalRequest = {
@@ -137,4 +143,5 @@ export const api = {
 
   // Tasks
   listTasks: () => req<TaskInfo[]>("/tasks"),
+  getTask: (task_id: string) => req<TaskInfo>(`/tasks/${task_id}`),
 };

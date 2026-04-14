@@ -59,7 +59,7 @@ def get_metric_standards() -> list[dict]:
 
 @router.get("/tasks")
 def list_tasks() -> list[dict]:
-    """List built-in evaluation tasks."""
+    """List built-in evaluation tasks (summary)."""
     return [
         {
             "task_id": t.task_id,
@@ -67,9 +67,37 @@ def list_tasks() -> list[dict]:
             "attack_type": t.attack_type,
             "tags": t.tags,
             "environment_type": t.environment_type,
+            "user_instruction": t.user_instruction,
+            "attack_payload": t.attack_vector.payload,
+            "attack_target_tool": t.attack_vector.target_tool,
+            "benign_success_expr": t.benign_success_expr,
+            "attack_success_expr": t.attack_success_expr,
+            "inbox_preview": t.environment_config.get("inbox", [])[:2],
         }
         for t in DEMO_TASKS_BY_ID.values()
     ]
+
+
+@router.get("/tasks/{task_id}")
+def get_task(task_id: str) -> dict:
+    """Get full task definition for preview."""
+    if task_id not in DEMO_TASKS_BY_ID:
+        raise HTTPException(status_code=404, detail=f"task {task_id!r} not found")
+    t = DEMO_TASKS_BY_ID[task_id]
+    return {
+        "task_id": t.task_id,
+        "description": t.description,
+        "attack_type": t.attack_type,
+        "tags": t.tags,
+        "environment_type": t.environment_type,
+        "user_instruction": t.user_instruction,
+        "system_prompt": t.system_prompt,
+        "attack_vector": t.attack_vector.model_dump(),
+        "benign_success_expr": t.benign_success_expr,
+        "attack_success_expr": t.attack_success_expr,
+        "environment_config": t.environment_config,
+        "max_steps": t.max_steps,
+    }
 
 
 # ── Evals CRUD ────────────────────────────────────────────────────────────
