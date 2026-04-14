@@ -23,7 +23,9 @@ GET  /api/v1/agent-eval/tasks
 from __future__ import annotations
 
 import asyncio
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -55,6 +57,10 @@ _mon = RuntimeMonitor()
 
 router = APIRouter(prefix="/api/v1/agent-eval")
 _store = SqliteStore()
+
+# In-memory running-task tracker: batch_id → set of "task_id:style" strings
+_batch_running: dict[str, set[str]] = {}
+_batch_lock = threading.Lock()
 
 
 # ── Request / Response schemas ────────────────────────────────────────────
@@ -256,13 +262,16 @@ def list_batches() -> list[dict]:
 @router.get("/batch-evals/{batch_id}")
 def get_batch(batch_id: str) -> dict:
     try:
-        return _store.get_batch(batch_id)
+        data = _store.get_batch(batch_id)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"batch {batch_id!r} not found")
+    with _batch_lock:
+        data["running_tasks"] = sorted(_batch_running.get(batch_id, set()))
+    return data
 
 
 @router.post("/batch-evals", status_code=202)
-def create_batch(req: CreateBatchRequest, background_tasks: BackgroundTasks) -> dict:
+def create_batch(req: CreateBatchRequest) -> dict:
     """
     Start a batch evaluation across multiple tasks × injection styles.
     Returns immediately with batch_id; poll GET /batch-evals/{id} for progress.
@@ -303,7 +312,7 @@ def create_batch(req: CreateBatchRequest, background_tasks: BackgroundTasks) -> 
     if not tasks or not styles:
         raise HTTPException(status_code=400, detail="No tasks or styles selected")
 
-    combos = [(t, s) for t in tasks for s in styles]
+    combos = [(task, s) for task in tasks for s in styles]
     batch_id = "batch_" + uuid.uuid4().hex[:10]
     config = {
         "model": model,
@@ -313,14 +322,18 @@ def create_batch(req: CreateBatchRequest, background_tasks: BackgroundTasks) -> 
     }
     batch = _store.create_batch(batch_id, model, len(combos), config)
 
-    background_tasks.add_task(
-        _run_batch_background,
-        batch_id=batch_id,
-        combos=[(t.task_id, s.value) for t, s in combos],
-        model=model,
-        api_key=api_key,
-        base_url=base_url,
+    thread = threading.Thread(
+        target=_run_batch_background,
+        kwargs=dict(
+            batch_id=batch_id,
+            combos=[(task.task_id, s.value) for task, s in combos],
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+        ),
+        daemon=True,
     )
+    thread.start()
     return batch
 
 
@@ -451,6 +464,9 @@ def _make_step_callback(eval_id: str):
     return callback
 
 
+_BATCH_CONCURRENCY = 4  # parallel LLM calls per batch
+
+
 def _run_batch_background(
     batch_id: str,
     combos: list[tuple[str, str]],  # [(task_id, style_value), ...]
@@ -458,18 +474,23 @@ def _run_batch_background(
     api_key: str,
     base_url: str,
 ) -> None:
-    """Run all (task, style) combinations sequentially and update batch progress."""
-    import time as _time
-    from agent_eval.task_spec import InjectionStyle
+    """Run all (task, style) combos with up to _BATCH_CONCURRENCY parallel workers."""
+    from agent_eval.task_spec import EvalTask, InjectionStyle, InjectionVector
 
-    done = 0
-    failed = 0
-    for task_id, style_value in combos:
+    # Register running set
+    with _batch_lock:
+        _batch_running[batch_id] = set()
+
+    done_count = 0
+    failed_count = 0
+    lock = threading.Lock()
+
+    def _run_one(task_id: str, style_value: str) -> bool:
+        slot = f"{task_id}:{style_value}"
+        with _batch_lock:
+            _batch_running[batch_id].add(slot)
         try:
-            # Override the task's injection style
             base_task = DEMO_TASKS_BY_ID[task_id]
-            # Build a modified task with the requested style
-            from agent_eval.task_spec import EvalTask, InjectionVector
             av = base_task.attack_vector
             new_av = InjectionVector(
                 target_tool=av.target_tool,
@@ -494,14 +515,29 @@ def _run_batch_background(
             eval_record = _store.create_eval(task_id, model)
             eval_id = eval_record["eval_id"]
             _run_eval_background(eval_id, task_id, model, api_key, base_url, override_task=task)
-            done += 1
+            return True
         except Exception:
-            failed += 1
-        _store.update_batch(batch_id, done_count=done, failed_count=failed)
-        _time.sleep(0.5)  # brief pause between calls
+            return False
+        finally:
+            with _batch_lock:
+                _batch_running[batch_id].discard(slot)
 
-    final_status = "done" if failed == 0 else ("failed" if done == 0 else "done_with_errors")
-    _store.update_batch(batch_id, status=final_status, done_count=done, failed_count=failed)
+    with ThreadPoolExecutor(max_workers=_BATCH_CONCURRENCY) as pool:
+        futures = {pool.submit(_run_one, task_id, style): (task_id, style)
+                   for task_id, style in combos}
+        for future in as_completed(futures):
+            success = future.result()
+            with lock:
+                if success:
+                    done_count += 1
+                else:
+                    failed_count += 1
+                _store.update_batch(batch_id, done_count=done_count, failed_count=failed_count)
+
+    with _batch_lock:
+        _batch_running.pop(batch_id, None)
+    final_status = "done" if failed_count == 0 else ("failed" if done_count == 0 else "done_with_errors")
+    _store.update_batch(batch_id, status=final_status, done_count=done_count, failed_count=failed_count)
 
 
 def _run_eval_background(
