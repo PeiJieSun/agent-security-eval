@@ -6,7 +6,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 
 // ── Nav structure ────────────────────────────────────────────────────────────
 
-type NavItem = { label: string; path: string; mono?: boolean };
+type NavItem = { label: string; path: string; desc?: string };
 type NavSection = { heading: string; badge?: string; items: NavItem[] };
 
 const NAV: NavSection[] = [
@@ -14,59 +14,59 @@ const NAV: NavSection[] = [
     heading: "一类威胁",
     badge: "外部攻击防御",
     items: [
-      { label: "评测列表", path: "/" },
-      { label: "新建评测", path: "/evals/new" },
-      { label: "批量评测", path: "/batch-eval" },
-      { label: "多模型横评", path: "/benchmark" },
-      { label: "评测标准", path: "/standards" },
-      { label: "发布门", path: "/release-gate" },
+      { label: "评测列表",   path: "/",            desc: "所有单次攻防评测记录" },
+      { label: "新建评测",   path: "/evals/new",   desc: "选任务+模型，运行一次评测" },
+      { label: "批量评测",   path: "/batch-eval",  desc: "任务×风格批量跑，汇总三维指标" },
+      { label: "多模型横评", path: "/benchmark",   desc: "同批任务跨模型对比安全性" },
+      { label: "评测标准",   path: "/standards",   desc: "三维指标定义与学术出处" },
+      { label: "发布门",     path: "/release-gate",desc: "指标阈值联动 CI pass/fail" },
     ],
   },
   {
     heading: "二类威胁",
     badge: "Agent 诚实性",
     items: [
-      { label: "一致性探测", path: "/safety/consistency" },
-      { label: "评测感知", path: "/safety/eval-awareness" },
-      { label: "CoT 推理审计", path: "/safety/cot-audit" },
-      { label: "后门扫描", path: "/safety/backdoor-scan" },
-      { label: "PoT 后门检测", path: "/safety/pot-backdoor" },
+      { label: "一致性探测",   path: "/safety/consistency",    desc: "相似提问行为是否稳定（后门预警）" },
+      { label: "评测感知",     path: "/safety/eval-awareness", desc: "检测 agent 是否识别出被测评" },
+      { label: "CoT 推理审计", path: "/safety/cot-audit",      desc: "推理链 vs 实际工具调用一致性" },
+      { label: "后门扫描",     path: "/safety/backdoor-scan",  desc: "触发词注入后行为突变检测" },
+      { label: "PoT 后门检测", path: "/safety/pot-backdoor",   desc: "分析 system prompt 中的推理链后门" },
     ],
   },
   {
     heading: "攻击变体",
     badge: "外部攻击扩展",
     items: [
-      { label: "记忆投毒", path: "/safety/memory-poison" },
-      { label: "进化攻击搜索", path: "/safety/evo-attack" },
+      { label: "记忆投毒",     path: "/safety/memory-poison", desc: "RAG 记忆污染 → ASR vs 污染率曲线" },
+      { label: "进化攻击搜索", path: "/safety/evo-attack",    desc: "轨迹反馈驱动的自动化攻击变异" },
     ],
   },
   {
     heading: "攻击分析",
     badge: "路径发现",
     items: [
-      { label: "工具调用图", path: "/analysis/tool-graph" },
+      { label: "工具调用图", path: "/analysis/tool-graph", desc: "从历史轨迹提取高危工具调用链路" },
     ],
   },
   {
     heading: "行为追踪",
     badge: "长期监控",
     items: [
-      { label: "长期趋势", path: "/behavior/trend" },
+      { label: "长期趋势", path: "/behavior/trend", desc: "跨版本三维指标漂移与 KL 散度" },
     ],
   },
   {
     heading: "MCP 安全",
     badge: "协议层攻击",
     items: [
-      { label: "工具投毒检测", path: "/mcp-security" },
+      { label: "工具投毒检测", path: "/mcp-security", desc: "hidden payload 注入 MCP tool 描述" },
     ],
   },
   {
     heading: "开放世界评测",
     badge: "任意 Agent",
     items: [
-      { label: "Docker 沙箱", path: "/sandbox" },
+      { label: "Docker 沙箱", path: "/sandbox", desc: "隔离容器中运行任意 agent 框架评测" },
     ],
   },
 ];
@@ -82,18 +82,24 @@ function SideNavItem({ item }: { item: NavItem }) {
       end={item.path === "/"}
       className={({ isActive }) =>
         [
-          "flex items-center gap-2 px-3 py-1.5 rounded text-[13px] transition-colors select-none",
+          "flex items-start gap-2 px-3 py-1.5 rounded transition-colors select-none",
           isActive
-            ? "bg-white/10 text-white font-medium"
+            ? "bg-white/10 text-white"
             : "text-slate-400 hover:text-slate-200 hover:bg-white/5",
         ].join(" ")
       }
     >
-      <span
-        className="w-1 h-1 rounded-full bg-current opacity-50 shrink-0"
-        aria-hidden
-      />
-      {item.label}
+      {({ isActive }) => (
+        <>
+          <span className="w-1 h-1 rounded-full bg-current opacity-50 shrink-0 mt-[5px]" aria-hidden />
+          <span className="min-w-0">
+            <span className={`block text-[13px] ${isActive ? "font-medium text-white" : ""}`}>{item.label}</span>
+            {item.desc && (
+              <span className="block text-[10px] text-slate-600 leading-tight mt-0.5 truncate">{item.desc}</span>
+            )}
+          </span>
+        </>
+      )}
     </NavLink>
   );
 }

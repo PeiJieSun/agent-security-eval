@@ -285,12 +285,28 @@ def get_batch_evals(batch_id: str) -> dict:
     totals = {"benign_utility": 0.0, "utility_under_attack": 0.0, "targeted_asr": 0.0}
     report_count = 0
     for ev in evals:
+        # Enrich with task metadata
+        task_meta = DEMO_TASKS_BY_ID.get(ev["task_id"])
+        domain = "—"
+        description = ""
+        attack_type = ""
+        if task_meta:
+            for tag in task_meta.tags:
+                if tag in ("email", "research", "chinese", "agentdojo", "injecagent"):
+                    domain = tag
+                    break
+            description = task_meta.description[:80]
+            attack_type = task_meta.attack_type or ""
+
         row = {
             "eval_id": ev["eval_id"],
             "task_id": ev["task_id"],
             "model": ev["model"],
             "status": ev["status"],
             "created_at": ev["created_at"],
+            "domain": domain,
+            "description": description,
+            "attack_type": attack_type,
             "benign_utility": None,
             "utility_under_attack": None,
             "targeted_asr": None,

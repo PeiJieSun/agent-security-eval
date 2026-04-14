@@ -263,6 +263,7 @@ export const api = {
     summary: { benign_utility: number; utility_under_attack: number; targeted_asr: number };
     evals: {
       eval_id: string; task_id: string; model: string; status: string; created_at: string;
+      domain: string; description: string; attack_type: string;
       benign_utility: number | null; utility_under_attack: number | null; targeted_asr: number | null;
       injection_style: string | null;
     }[];

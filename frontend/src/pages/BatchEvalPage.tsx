@@ -35,6 +35,7 @@ interface Batch {
 
 interface EvalRow {
   eval_id: string; task_id: string; model: string; status: string; created_at: string;
+  domain: string; description: string; attack_type: string;
   benign_utility: number | null; utility_under_attack: number | null; targeted_asr: number | null;
   injection_style: string | null;
 }
@@ -60,20 +61,72 @@ function MetricBar({ value, color }: { value: number; color: string }) {
   );
 }
 
+const DOMAIN_COLORS: Record<string, string> = {
+  email: "bg-blue-50 text-blue-700 border-blue-200",
+  research: "bg-violet-50 text-violet-700 border-violet-200",
+  chinese: "bg-orange-50 text-orange-700 border-orange-200",
+  agentdojo: "bg-teal-50 text-teal-700 border-teal-200",
+  injecagent: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+const STYLE_LABELS: Record<string, string> = {
+  naive: "直接注入", camouflaged: "伪装", authority: "权威",
+  encoded: "编码", chinese_obfuscated: "中文混淆",
+};
+
+function DomainBadge({ domain }: { domain: string }) {
+  const cls = DOMAIN_COLORS[domain] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  return <span className={`px-1.5 py-0.5 rounded border text-[10px] font-medium ${cls}`}>{domain}</span>;
+}
+
 function BatchResultPanel({
-  result, showTable, onToggleTable,
-}: { result: BatchResult; showTable: boolean; onToggleTable: () => void }) {
+  result, batch, showTable, onToggleTable, onRerun,
+}: {
+  result: BatchResult;
+  batch: Batch;
+  showTable: boolean;
+  onToggleTable: () => void;
+  onRerun: () => void;
+}) {
   const s = result.summary;
   const safetyScore = Math.round(((s.benign_utility + s.utility_under_attack + (1 - s.targeted_asr)) / 3) * 100);
+  const cfg = batch.config;
 
   return (
     <div className="space-y-4">
+      {/* Batch config + re-run */}
+      <div className="flex items-start justify-between gap-4 px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="space-y-1 text-[11px] text-slate-600 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-slate-700">模型</span>
+            <span className="font-mono">{batch.model}</span>
+            <span className="text-slate-300">·</span>
+            <span className="font-medium text-slate-700">任务域</span>
+            {(cfg.domains ?? []).map(d => <DomainBadge key={d} domain={d} />)}
+            <span className="text-slate-300">·</span>
+            <span className="font-medium text-slate-700">注入风格</span>
+            <span>{(cfg.injection_styles ?? []).map(s => STYLE_LABELS[s] ?? s).join("、")}</span>
+          </div>
+          <div className="text-slate-400">
+            共 {result.total} 个评测 · {result.with_report} 条报告 ·{" "}
+            {new Date(batch.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          </div>
+        </div>
+        <button
+          onClick={onRerun}
+          className="shrink-0 text-[11px] px-3 py-1.5 rounded border border-slate-300 text-slate-600
+                     hover:border-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap"
+        >
+          ↻ 重新运行
+        </button>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
         {([
-          { label: "安全综合分", value: `${safetyScore}`, sub: "三维平均", big: true, warn: false },
+          { label: "安全综合分", value: `${safetyScore}`, sub: "三维加权平均", big: true, warn: false },
           { label: "Benign Utility", value: `${(s.benign_utility * 100).toFixed(1)}%`, sub: "正常任务完成率", warn: false },
-          { label: "Under Attack", value: `${(s.utility_under_attack * 100).toFixed(1)}%`, sub: "攻击下完成率", warn: false },
+          { label: "Under Attack", value: `${(s.utility_under_attack * 100).toFixed(1)}%`, sub: "攻击下任务完成率", warn: false },
           { label: "攻击成功率 ASR", value: `${(s.targeted_asr * 100).toFixed(1)}%`, sub: "越低越安全", warn: s.targeted_asr > 0.3 },
         ] as { label: string; value: string; sub: string; big?: boolean; warn: boolean }[]).map(c => (
           <div key={c.label} className={`border rounded-lg p-3 ${c.warn ? "border-red-200 bg-red-50/30" : "border-slate-200"}`}>
@@ -98,7 +151,7 @@ function BatchResultPanel({
         ))}
       </div>
 
-      {/* Per-task table */}
+      {/* Per-task detail table */}
       <div>
         <button
           onClick={onToggleTable}
@@ -112,24 +165,22 @@ function BatchResultPanel({
             <table className="w-full text-[11px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  {["任务 ID", "注入风格", "状态", "Benign Util", "Under Attack", "ASR"].map(h => (
-                    <th key={h} className="px-3 py-2 text-left font-medium text-slate-500">{h}</th>
+                  {["域", "任务 ID", "任务描述", "攻击类型", "注入风格", "Benign", "Under Attack", "ASR"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {result.evals.map(e => (
                   <tr key={e.eval_id} className="hover:bg-slate-50">
-                    <td className="px-3 py-1.5 font-mono text-slate-700 max-w-[160px] truncate">{e.task_id}</td>
-                    <td className="px-3 py-1.5 text-slate-500">{e.injection_style ?? "—"}</td>
-                    <td className="px-3 py-1.5">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                        e.status === "done" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-                      }`}>{e.status}</span>
-                    </td>
+                    <td className="px-3 py-1.5"><DomainBadge domain={e.domain} /></td>
+                    <td className="px-3 py-1.5 font-mono text-slate-700 max-w-[120px] truncate" title={e.task_id}>{e.task_id}</td>
+                    <td className="px-3 py-1.5 text-slate-500 max-w-[200px] truncate" title={e.description}>{e.description || "—"}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{e.attack_type || "—"}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{e.injection_style ? (STYLE_LABELS[e.injection_style] ?? e.injection_style) : "—"}</td>
                     <td className="px-3 py-1.5 text-center">{e.benign_utility != null ? `${(e.benign_utility * 100).toFixed(0)}%` : "—"}</td>
                     <td className="px-3 py-1.5 text-center">{e.utility_under_attack != null ? `${(e.utility_under_attack * 100).toFixed(0)}%` : "—"}</td>
-                    <td className={`px-3 py-1.5 text-center font-medium ${e.targeted_asr && e.targeted_asr > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                    <td className={`px-3 py-1.5 text-center font-medium ${e.targeted_asr != null && e.targeted_asr > 0 ? "text-red-600" : "text-emerald-600"}`}>
                       {e.targeted_asr != null ? `${(e.targeted_asr * 100).toFixed(0)}%` : "—"}
                     </td>
                   </tr>
@@ -486,7 +537,19 @@ export default function BatchEvalPage() {
           )}
 
           {!isRunning && (activeBatch.status === "done" || activeBatch.status === "done_with_errors") && batchResult && (
-            <BatchResultPanel result={batchResult} showTable={showTable} onToggleTable={() => setShowTable(t => !t)} />
+            <BatchResultPanel
+              result={batchResult}
+              batch={activeBatch}
+              showTable={showTable}
+              onToggleTable={() => setShowTable(t => !t)}
+              onRerun={() => {
+                // Pre-fill selectors from batch config
+                const cfg = activeBatch.config;
+                if (cfg.domains) setSelDomains(new Set(cfg.domains));
+                if (cfg.injection_styles) setSelStyles(new Set(cfg.injection_styles));
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            />
           )}
           {!isRunning && activeBatch.status === "cancelled" && (
             <p className="text-[12px] text-slate-500">已手动停止，共完成 {activeBatch.done_count}/{activeBatch.total} 个评测</p>
