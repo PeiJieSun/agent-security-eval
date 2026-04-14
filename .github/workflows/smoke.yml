@@ -1,0 +1,64 @@
+name: Agent Eval Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "LLM model to evaluate"
+        default: "gpt-4o-mini"
+        required: true
+      suite:
+        description: "Benchmark suite (p0_smoke | standard_v1)"
+        default: "p0_smoke"
+        required: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m agent_eval.api.main --port 18200 &
+          # Wait for it to be ready
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:18200/health && break || sleep 2
+          done
+
+      - name: Verify task manifest
+        run: python scripts/freeze_benchmark.py --verify
+
+      - name: Run smoke suite
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/run_smoke.py \
+            --model "${{ github.event.inputs.model || 'gpt-4o-mini' }}" \
+            --suite "${{ github.event.inputs.suite || 'p0_smoke' }}" \
+            --base-url http://localhost:18200/api/v1/agent-eval \
+            --timeout 600
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: agent_eval_data.db
+          if-no-files-found: ignore

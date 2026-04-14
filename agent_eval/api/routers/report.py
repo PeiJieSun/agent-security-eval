@@ -9,7 +9,10 @@ from __future__ import annotations
 import statistics
 from typing import Any, Optional
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Query
+from fastapi.responses import HTMLResponse
 
 from agent_eval.evaluation_frameworks import FRAMEWORKS_BY_ID
 from agent_eval.storage.sqlite_store import SqliteStore
@@ -204,6 +207,135 @@ def get_agent_report(model: str = Query(..., description="Model name to report o
         "source_batch": batch_id,
         "dimensions":   dimensions,
     }
+
+
+@router.get("/agent-report/export", response_class=HTMLResponse)
+def export_agent_report(model: str = Query(...)) -> HTMLResponse:
+    """Export a self-contained HTML safety report for the given model."""
+    data = get_agent_report(model)
+    fw = FRAMEWORKS_BY_ID.get("owasp_llm10", {})
+    owasp_dims = {d["id"]: d for d in fw.get("dimensions", [])}
+
+    # OWASP cross-reference mapping: internal dim → OWASP ids
+    OWASP_MAP: dict[str, list[str]] = {
+        "t1_benign_utility":         ["llm01_prompt_injection", "llm06_excessive_agency"],
+        "t1_attack_robustness":      ["llm01_prompt_injection"],
+        "t1_attack_resistance":      ["llm01_prompt_injection", "llm06_excessive_agency"],
+        "t1_style_diversity":        ["llm01_prompt_injection"],
+        "t2_behavioral_consistency": ["llm09_misinformation"],
+        "t2_reasoning_faithfulness": ["llm09_misinformation"],
+        "t2_eval_transparency":      ["llm09_misinformation"],
+        "t2_backdoor_absence":       ["llm04_data_model_poisoning"],
+        "t3_mcp_tool_integrity":     ["llm03_supply_chain", "llm06_excessive_agency"],
+        "t3_memory_integrity":       ["llm08_vector_embedding", "llm04_data_model_poisoning"],
+        "t3_execution_isolation":    ["llm06_excessive_agency"],
+        "t3_min_privilege":          ["llm06_excessive_agency"],
+    }
+
+    def status_color(s: str) -> str:
+        return {"pass": "#22c55e", "fail": "#ef4444", "not_run": "#6b7280"}[s]
+
+    def status_label(s: str) -> str:
+        return {"pass": "PASS", "fail": "FAIL", "not_run": "—"}[s]
+
+    def score_str(v: Optional[float]) -> str:
+        return f"{v*100:.1f}%" if v is not None else "—"
+
+    overall_color = status_color(data["overall"])
+    overall_label = status_label(data["overall"])
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    rows = ""
+    for d in data["dimensions"]:
+        owasp_refs = OWASP_MAP.get(d["id"], [])
+        owasp_html = ""
+        for oid in owasp_refs:
+            od = owasp_dims.get(oid, {})
+            name = od.get("name_en", oid)
+            owasp_html += f'<span style="background:#1e293b;border:1px solid #334155;border-radius:3px;padding:1px 5px;font-size:10px;color:#94a3b8;margin-right:3px">{name}</span>'
+
+        sc = status_color(d["status"])
+        rows += f"""
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b">
+            <div style="font-size:13px;color:#e2e8f0">{d['name']}</div>
+            <div style="font-size:10px;color:#475569;margin-top:2px">{d['description']}</div>
+          </td>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b;font-size:11px;color:#64748b">{d['tier']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b;font-size:11px;color:#64748b">{d['threshold']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b;font-size:12px;font-family:monospace;color:#cbd5e1">{score_str(d['score'])}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b">
+            <span style="font-size:11px;font-family:monospace;color:{sc};border:1px solid {sc};border-radius:3px;padding:1px 6px">{status_label(d['status'])}</span>
+          </td>
+          <td style="padding:8px 12px;border-bottom:1px solid #1e293b">{owasp_html}</td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Security Report — {model}</title>
+<style>
+  body{{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0d0d0d;color:#e2e8f0}}
+  .container{{max-width:900px;margin:0 auto;padding:32px 24px}}
+  table{{width:100%;border-collapse:collapse}}
+  th{{text-align:left;padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#475569;background:#111827;border-bottom:1px solid #1e293b}}
+  tr:hover td{{background:#111827}}
+  .badge{{display:inline-block;font-size:11px;font-family:monospace;border-radius:3px;padding:2px 8px}}
+  h1{{font-size:18px;font-weight:700;color:#f1f5f9;margin:0 0 4px}}
+  .meta{{font-size:12px;color:#475569;margin-bottom:24px}}
+  .summary{{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}}
+  .card{{border:1px solid #1e293b;border-radius:6px;padding:12px 16px;min-width:140px}}
+  .card-label{{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#475569;margin-bottom:4px}}
+  .card-value{{font-size:20px;font-weight:700;font-family:monospace}}
+  h2{{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#475569;margin:24px 0 8px;padding-left:2px}}
+  .section{{border:1px solid #1e293b;border-radius:6px;overflow:hidden;margin-bottom:20px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Agent Security Report</h1>
+  <div class="meta">Model: <strong style="color:#cbd5e1">{model}</strong> &nbsp;·&nbsp; Framework: 内部方案 v1 &nbsp;·&nbsp; {ts}</div>
+
+  <div class="summary">
+    <div class="card" style="border-color:{overall_color}">
+      <div class="card-label">综合结论</div>
+      <div class="card-value" style="color:{overall_color}">{overall_label}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">通过维度</div>
+      <div class="card-value" style="color:#22c55e">{data['passed']} / {data['scored']}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">未运行</div>
+      <div class="card-value" style="color:#6b7280">{data['not_run']}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">数据来源</div>
+      <div style="font-size:11px;font-family:monospace;color:#64748b;margin-top:4px">{(data['source_batch'] or '—')[:16]}</div>
+    </div>
+  </div>
+
+  <table class="section">
+    <thead><tr>
+      <th>维度</th><th>分类</th><th>阈值</th><th>得分</th><th>结论</th><th>OWASP LLM Top 10 对应</th>
+    </tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+
+  <div style="font-size:10px;color:#334155;margin-top:24px">
+    内部方案 v1 — 集团 AI 安全评测框架 &nbsp;|&nbsp;
+    参考：AgentDojo (NeurIPS 2024) · OWASP LLM Top 10 (2025) · MITRE ATLAS
+  </div>
+</div>
+</body>
+</html>"""
+
+    return HTMLResponse(
+        content=html,
+        headers={"Content-Disposition": f'attachment; filename="agent-report-{model}.html"'},
+    )
 
 
 @router.get("/agent-report/models")

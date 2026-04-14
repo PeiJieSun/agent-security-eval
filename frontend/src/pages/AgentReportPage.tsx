@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { PageHeader } from "../components/PageHeader";
+import { PageHeader } from "../components/AppShell";
 
 type Dimension = {
   id: string;
@@ -150,8 +150,8 @@ export default function AgentReportPage() {
         subtitle="内部方案 v1 — 一/二/三类威胁十二维综合评分卡"
       />
 
-      {/* Model selector */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Model selector + export */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <label className="text-[12px] text-slate-500">模型</label>
         {models.length > 0 ? (
           <select
@@ -165,6 +165,16 @@ export default function AgentReportPage() {
           </select>
         ) : (
           <span className="text-[12px] text-slate-600">暂无已完成的评测记录</span>
+        )}
+        {selectedModel && (
+          <a
+            href={`/agent-report/export?model=${encodeURIComponent(selectedModel)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto text-[12px] border border-white/10 rounded px-3 py-1 text-slate-400 hover:text-slate-200 hover:border-white/20 transition-colors"
+          >
+            导出 HTML ↗
+          </a>
         )}
       </div>
 
