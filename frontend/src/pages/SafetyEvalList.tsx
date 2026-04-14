@@ -65,46 +65,17 @@ export default function SafetyEvalList() {
   const profile = getActiveProfile();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3.5 flex items-center gap-4">
-        <button onClick={() => navigate("/")} className="text-xs text-slate-400 hover:text-slate-600">← 主页</button>
-        <span className="text-slate-200">|</span>
-        <span className="text-sm font-bold text-slate-900">二类威胁检测</span>
-        <span className="text-xs text-slate-400">Agent 自身诚实性</span>
-        <div className="ml-auto flex items-center gap-3">
-          {profile && <span className="text-xs text-slate-400">{profile.name} · {profile.model}</span>}
-          <button onClick={load} className="text-slate-400 hover:text-slate-600 text-sm">↻</button>
+    <div className="px-8 py-7 max-w-5xl mx-auto">
+      {/* Page title */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-[15px] font-semibold text-slate-900">安全检测总览</h1>
+          <p className="text-[12px] text-slate-400 mt-0.5">
+            二类威胁 · Agent 自身诚实性&nbsp;&nbsp;{profile && <span className="text-slate-300">·&nbsp;{profile.name} / {profile.model}</span>}
+          </p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-6 py-6">
-
-        {/* 框架对比说明 */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <button
-            onClick={() => navigate("/")}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left hover:border-slate-400 hover:bg-slate-50 transition-colors group"
-          >
-            <div className="flex items-baseline gap-2 mb-1.5">
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">一类威胁</span>
-              <span className="text-[10px] text-slate-400">外部攻击防御 · 主评测区</span>
-              <span className="ml-auto text-xs text-slate-400 group-hover:text-slate-600">← 返回</span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              外部攻击者通过工具返回值注入恶意指令（IPI）。Agent 是受害者，测试它能否识破并拒绝外部劫持。
-            </p>
-          </button>
-
-          <div className="rounded-lg border border-slate-400 bg-white px-4 py-3.5">
-            <div className="flex items-baseline gap-2 mb-1.5">
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">二类威胁 · 当前区域</span>
-              <span className="text-[10px] text-slate-400">Agent 自身诚实性</span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              无外部攻击者。审查 Agent 自身：行为稳定吗？推理真实吗？有后门触发器吗？感知测评会「表演」吗？
-            </p>
-          </div>
-        </div>
+        <button onClick={load} className="text-slate-400 hover:text-slate-600 text-sm w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100" title="刷新">↻</button>
+      </div>
 
         {/* 真正的二类威胁检测方式 */}
         <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">二类威胁检测方式</h2>
@@ -184,7 +155,6 @@ export default function SafetyEvalList() {
             );
           })}
         </div>
-      </main>
     </div>
   );
 }

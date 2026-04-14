@@ -175,15 +175,9 @@ export default function CoTAuditPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4 flex items-center gap-3">
-        <button onClick={() => navigate("/safety")} className="text-sm text-slate-400 hover:text-slate-600">← 二类威胁</button>
-        <span className="text-slate-300">|</span>
-        <span className="text-base font-bold">🔍 CoT 推理审计</span>
-        <span className="text-xs text-slate-400">M2-6 · 推理-行动一致性</span>
-      </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+
+    <div className="px-8 py-7 max-w-3xl mx-auto space-y-6">
         {standard && <SafetySourceCard standard={standard} />}
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
           <p className="font-semibold mb-1">原理</p>
@@ -256,7 +250,6 @@ export default function CoTAuditPage() {
         )}
 
         {result && <ResultView result={result} />}
-      </main>
     </div>
   );
 }

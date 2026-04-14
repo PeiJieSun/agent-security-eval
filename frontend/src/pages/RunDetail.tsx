@@ -149,19 +149,19 @@ export default function RunDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-sm text-slate-400">Loading…</p>
+      <div className="px-8 py-20 flex items-center justify-center">
+        <p className="text-sm text-slate-400">加载中…</p>
       </div>
     );
   }
 
   if (error || !run) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="px-8 py-20 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-rose-600 text-sm mb-3">{error || "Run not found"}</p>
+          <p className="text-slate-600 text-sm mb-3">{error || "Run not found"}</p>
           <button className="text-sm text-slate-500 underline" onClick={() => navigate("/")}>
-            ← Back to runs
+            ← 返回
           </button>
         </div>
       </div>
@@ -172,22 +172,7 @@ export default function RunDetail() {
   const hasDiff = diff.added.length + diff.removed.length + diff.modified.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Top bar */}
-      <header className="border-b border-slate-200 bg-white px-6 py-4 flex items-center gap-4">
-        <button
-          className="text-sm text-slate-400 hover:text-slate-700 transition-colors"
-          onClick={() => navigate("/")}
-        >
-          ← Runs
-        </button>
-        <span className="text-slate-200">|</span>
-        <span className="text-lg font-black tracking-tight text-slate-900">
-          Agent<span className="text-rose-600">Eval</span>
-        </span>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-6 py-8">
+    <div className="px-8 py-7 max-w-4xl mx-auto">
         {/* Run header */}
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
           <div className="flex items-start gap-4">
@@ -269,7 +254,6 @@ export default function RunDetail() {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 }

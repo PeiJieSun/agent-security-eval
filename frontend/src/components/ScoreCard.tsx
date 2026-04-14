@@ -50,19 +50,11 @@ const CN_INTERPRET: Record<string, (v: number) => { label: string; color: string
 
 // ── Bar colors ────────────────────────────────────────────────────────────
 
-function barColor(id: string, value: number): string {
-  const isAttack = id === "targeted_asr" || id === "asr_valid";
-  if (isAttack) {
-    return "bg-slate-500";
-  }
+function barColor(_id: string): string {
   return "bg-slate-500";
 }
 
-function numColor(id: string, value: number): string {
-  const isAttack = id === "targeted_asr" || id === "asr_valid";
-  if (isAttack) {
-    return "text-slate-600";
-  }
+function numColor(_id: string): string {
   return "text-slate-600";
 }
 
@@ -90,11 +82,11 @@ export default function ScoreCard({ metric, bibtex }: { metric: MetricResult; bi
       <div className="flex items-center gap-2 mt-1">
         <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-700 ${barColor(metric.id, metric.value)}`}
+            className={`h-full rounded-full transition-all duration-700 ${barColor(metric.id)}`}
             style={{ width: metric.denominator === 0 ? "0%" : `${pct}%` }}
           />
         </div>
-        <span className={`text-base font-black tabular-nums w-14 text-right ${numColor(metric.id, metric.value)}`}>
+        <span className={`text-base font-black tabular-nums w-14 text-right ${numColor(metric.id)}`}>
           {metric.denominator === 0 ? "N/A" : `${pct}%`}
         </span>
       </div>

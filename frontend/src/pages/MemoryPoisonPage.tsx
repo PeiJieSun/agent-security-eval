@@ -93,15 +93,9 @@ export default function MemoryPoisonPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4 flex items-center gap-3">
-        <button onClick={() => navigate("/safety")} className="text-sm text-slate-400 hover:text-slate-600">← 二类威胁</button>
-        <span className="text-slate-300">|</span>
-        <span className="text-base font-bold">🧠 记忆投毒攻击</span>
-        <span className="text-xs text-slate-400">M2-1 · RAG 记忆污染</span>
-      </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+
+    <div className="px-8 py-7 max-w-3xl mx-auto space-y-6">
         {/* Source citation */}
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3.5">
           <div className="flex items-center gap-2 mb-2">
@@ -231,7 +225,6 @@ export default function MemoryPoisonPage() {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 }

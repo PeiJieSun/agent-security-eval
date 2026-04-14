@@ -85,36 +85,32 @@ export default function Standards() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <a href="/" className="text-sm text-gray-400 hover:text-gray-600">← 返回主页</a>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">评测维度标准</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            以下指标定义均逐字引用自同行评审学术论文，确保评测结果可复现、可比较、可引用。
-          </p>
-        </div>
+    <div className="px-8 py-7 max-w-3xl mx-auto">
+        <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">评测维度标准</h1>
+        <p className="text-[12px] text-slate-400 mb-6">
+          指标定义逐字引用自同行评审学术论文，确保评测结果可复现、可比较、可引用。
+        </p>
 
         {/* 方法论说明 */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 mb-6 text-[12px] text-slate-600 border-l-4 border-l-slate-400">
           <p>
-            <strong>框架来源：</strong>
+            <strong className="text-slate-700">框架来源：</strong>
             AgentDojo（Debenedetti et al., NeurIPS 2024）的三维框架捕捉了任意 LLM Agent 的安全-效用权衡关系。
             InjecAgent（Zhan et al., 2024）补充了 ASR-valid 指标，通过排除无效输出使攻击成功率的衡量更为精准。
           </p>
-          <p className="mt-1 text-blue-600 text-xs">
+          <p className="mt-1 text-slate-400">
             这两篇论文是目前学界评测 LLM Agent 安全性最广泛引用的基准。
           </p>
         </div>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <div className="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full" />
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <div className="animate-spin w-4 h-4 border-2 border-gray-300 border-t-slate-500 rounded-full" />
             加载中…
           </div>
         )}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          <div className="border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
             错误：{error}
           </div>
         )}
@@ -126,15 +122,14 @@ export default function Standards() {
         </div>
 
         {standards.length > 0 && (
-          <div className="mt-8 text-xs text-gray-400 border-t border-gray-200 pt-4 space-y-1">
-            <p className="font-semibold text-gray-500 mb-2">主要参考文献</p>
+          <div className="mt-8 text-xs text-slate-400 border-t border-slate-200 pt-4 space-y-1">
+            <p className="font-semibold text-slate-500 mb-2">主要参考文献</p>
             <p>[1] Debenedetti et al., "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection
               Attacks and Defenses for LLM Agents," NeurIPS 2024. arXiv:2406.13352</p>
             <p>[2] Zhan et al., "InjecAgent: Benchmarking Indirect Prompt Injections in
               Tool-Integrated Large Language Model Agents," 2024. arXiv:2403.02691</p>
           </div>
         )}
-      </div>
     </div>
   );
 }

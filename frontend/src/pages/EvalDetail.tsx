@@ -139,31 +139,27 @@ export default function EvalDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-rose-500 rounded-full" />
+      <div className="px-8 py-20 flex items-center justify-center">
+        <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-slate-500 rounded-full" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="px-8 py-8">
         <div className="border border-slate-200 rounded-lg p-4 text-slate-700 text-sm">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="px-8 py-7 max-w-4xl mx-auto">
         {/* 头部 */}
         <div className="flex items-start justify-between mb-5">
           <div>
-            <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
-              ← 返回主页
-            </button>
-            <h1 className="text-xl font-bold text-gray-900 mt-1">
-              评测：{evalRecord?.task_id}
+            <h1 className="text-[15px] font-semibold text-slate-900">
+              {evalRecord?.task_id}
             </h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {evalRecord && statusBadge(evalRecord.status)}
@@ -256,7 +252,6 @@ export default function EvalDetail() {
             </div>
           </>
         )}
-      </div>
     </div>
   );
 }

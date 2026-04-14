@@ -137,15 +137,11 @@ export default function NewEval() {
   const task = tasks.find((t) => t.task_id === selectedTask);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
-          ← 返回主页
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2 mb-1">一键测评</h1>
-        <p className="text-sm text-gray-500 mb-6">
+    <div className="px-8 py-7 max-w-2xl mx-auto">
+        <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">新建评测</h1>
+        <p className="text-[12px] text-slate-400 mb-6">
           对 LLM Agent 发起真实安全评测：正常运行 + 注入攻击各跑一次，输出{" "}
-          <a href="/standards" className="text-blue-600 hover:underline">4 维安全指标</a>。
+          <a href="/standards" className="underline underline-offset-2 hover:text-slate-600">4 维安全指标</a>。
         </p>
 
         {/* Settings shortcut */}
@@ -300,7 +296,6 @@ export default function NewEval() {
         <p className="text-xs text-gray-400 mt-4 text-center">
           评测在后台异步执行，提交后会自动跳转到结果页，等待完成。
         </p>
-      </div>
     </div>
   );
 }

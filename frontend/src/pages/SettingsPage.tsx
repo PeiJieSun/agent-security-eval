@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   loadProfiles,
   addProfile,
@@ -347,7 +346,6 @@ type EditingState =
   | { mode: "edit"; profile: LLMProfile };
 
 export default function SettingsPage() {
-  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<LLMProfile[]>([]);
   const [editing, setEditing] = useState<EditingState>({ mode: "none" });
 
@@ -380,15 +378,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <button onClick={() => navigate("/")} className="text-sm text-gray-400 hover:text-gray-600">
-          ← 返回主页
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2 mb-1">LLM 配置</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          支持配置多个 LLM 接入点，单选"默认"后评测自动使用该配置。
-          配置保存在浏览器本地，不上传服务器。
+    <div className="px-8 py-7 max-w-2xl mx-auto">
+        <h1 className="text-[15px] font-semibold text-slate-900 mb-0.5">LLM 配置</h1>
+        <p className="text-[12px] text-slate-400 mb-6">
+          支持配置多个 LLM 接入点，单选"默认"后评测自动使用该配置。配置保存在浏览器本地，不上传服务器。
         </p>
 
         {/* Profile list */}
@@ -454,7 +447,6 @@ export DEFAULT_MODEL=gpt-4o-mini`}
             表单 api_key 优先于服务端环境变量。两者均未填写时评测失败。
           </p>
         </div>
-      </div>
     </div>
   );
 }

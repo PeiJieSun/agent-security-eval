@@ -62,79 +62,32 @@ export default function Dashboard() {
   const errors  = evals.filter((e) => e.status === "error").length;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white px-6 py-3.5 flex items-center gap-4">
-        <span className="text-base font-bold tracking-tight text-slate-900">AgentEval</span>
-        <span className="text-slate-300">|</span>
-        <span className="text-sm text-slate-400">LLM Agent 安全评测</span>
-        <div className="ml-auto flex items-center gap-2">
-          <a href="/standards" className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100">
-            评测标准
-          </a>
-          <button
-            onClick={() => navigate("/safety")}
-            className="text-xs text-slate-600 px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50"
-          >
-            二类威胁检测
-          </button>
-          <button
-            onClick={() => navigate("/settings")}
-            className={`text-xs px-3 py-1.5 rounded border transition-colors ${
-              hasApiKey()
-                ? "border-slate-200 text-slate-500 hover:bg-slate-50"
-                : "border-slate-400 text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            {hasApiKey() ? "LLM 配置" : "⚠ 配置 API Key"}
-          </button>
-          <button
-            onClick={() => navigate("/evals/new")}
-            className="rounded bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-          >
-            + 新建评测
-          </button>
-          <button onClick={load} className="text-slate-400 hover:text-slate-600 text-base px-1" title="刷新">↻</button>
+    <div className="px-8 py-7 max-w-5xl mx-auto">
+      {/* Page title + actions */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-[15px] font-semibold text-slate-900">评测列表</h1>
+          <p className="text-[12px] text-slate-400 mt-0.5">
+            一类威胁 · 外部攻击防御 —&nbsp;
+            <a href="/standards" className="underline underline-offset-2 hover:text-slate-600">
+              AgentDojo §3.4 + InjecAgent §2.3
+            </a>
+          </p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-6 py-6">
-
-        {/* 测评框架说明（线条版） */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3.5">
-            <div className="flex items-baseline gap-2 mb-1.5">
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">一类威胁 · 当前区域</span>
-              <span className="text-[10px] text-slate-400">外部攻击防御</span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              外部攻击者通过工具返回值嵌入恶意指令（IPI）。测试：Agent 能否识破并拒绝外部劫持？
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              指标：Benign Utility · Utility Under Attack · Targeted ASR · ASR-valid
-              ·来源：AgentDojo NeurIPS 2024 · InjecAgent 2024
-            </p>
-          </div>
-
-          <button
-            onClick={() => navigate("/safety")}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left hover:border-slate-400 hover:bg-slate-50 transition-colors group"
-          >
-            <div className="flex items-baseline gap-2 mb-1.5">
-              <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">二类威胁</span>
-              <span className="text-[10px] text-slate-400">Agent 自身诚实性</span>
-              <span className="ml-auto text-xs text-slate-400 group-hover:text-slate-600">进入 →</span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Agent 本身是否可信？推理是否真实？行为是否稳定？是否有后门触发器？感知测评会「表演」吗？
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              检测：一致性探测 · 评测感知 · CoT 审计 · 后门扫描
-            </p>
-          </button>
+        <div className="flex items-center gap-2">
+          {!hasApiKey() && (
+            <button
+              onClick={() => navigate("/settings")}
+              className="text-xs text-slate-500 border border-slate-300 px-3 py-1.5 rounded hover:bg-slate-50"
+            >
+              ⚠ 配置 API Key
+            </button>
+          )}
+          <button onClick={load} className="text-slate-400 hover:text-slate-600 text-sm w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100" title="刷新">↻</button>
         </div>
+      </div>
 
-        {/* 统计栏 */}
+      {/* 统计栏 */}
         <div className="flex items-center gap-6 mb-5 px-1">
           {[
             { label: "总评测", value: total },
@@ -206,11 +159,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <p className="text-[11px] text-slate-400 mt-3 text-center">
-          每 5 秒自动刷新 · 指标来源：
-          <a href="/standards" className="underline underline-offset-2 hover:text-slate-600">AgentDojo §3.4 + InjecAgent §2.3</a>
-        </p>
-      </main>
+        <p className="text-[11px] text-slate-400 mt-3 text-center">每 5 秒自动刷新</p>
     </div>
   );
 }
