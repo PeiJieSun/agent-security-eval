@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import ToolFlowGraph from "../components/ToolFlowGraph";
 
 interface GraphNode {
   id: string;
@@ -33,7 +34,7 @@ export default function ToolCallGraphPage() {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"edges" | "paths" | "nodes">("edges");
+  const [activeTab, setActiveTab] = useState<"visual" | "edges" | "paths" | "nodes">("visual");
 
   const load = () => {
     setLoading(true);
@@ -124,7 +125,7 @@ export default function ToolCallGraphPage() {
           {/* Tabs */}
           <div>
             <div className="flex gap-0 border-b border-slate-200 mb-4">
-              {(["edges", "paths", "nodes"] as const).map((tab) => (
+              {(["visual", "edges", "paths", "nodes"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -134,10 +135,15 @@ export default function ToolCallGraphPage() {
                       : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
                 >
-                  {tab === "edges" ? "转移边" : tab === "paths" ? "TopK 路径" : "节点"}
+                  {tab === "visual" ? "可视化图" : tab === "edges" ? "转移边" : tab === "paths" ? "TopK 路径" : "节点"}
                 </button>
               ))}
             </div>
+
+            {/* Visual tab */}
+            {activeTab === "visual" && (
+              <ToolFlowGraph nodesData={graph.nodes} edgesData={graph.edges} />
+            )}
 
             {/* Edges tab */}
             {activeTab === "edges" && (

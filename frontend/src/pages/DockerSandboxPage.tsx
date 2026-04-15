@@ -2,13 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ToolHook {
-  name: string;
-  description: string;
-  inject_payload?: string;
-  inject_on_call: number;
-}
-
 interface SandboxScenario {
   spec_id: string;
   name: string;
