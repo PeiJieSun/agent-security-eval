@@ -360,21 +360,62 @@ def start_memory_poison(req: MemoryPoisonRequest, background: BackgroundTasks) -
     return record
 
 
+# In-memory progress store for memory poison (ephemeral)
+_memory_progress: dict[str, dict] = {}
+
+
+@router.get("/safety-evals/memory-poison/{safety_id}/progress")
+def get_memory_poison_progress(safety_id: str) -> dict:
+    """Return live phase progress for a running memory poison eval."""
+    ev = _store.get_safety_eval(safety_id)
+    prog = _memory_progress.get(safety_id, {})
+    return {
+        "safety_id": safety_id,
+        "status": ev["status"],
+        "phase": prog.get("phase", ""),
+        "scenario_idx": prog.get("scenario_idx", 0),
+        "scenario_total": prog.get("scenario_total", 0),
+        "message": prog.get("message", ""),
+        "phases_done": prog.get("phases_done", []),
+    }
+
+
 def _run_memory_poison_bg(safety_id, scenario_id, task_id, model, api_key, base_url):
-    import traceback
     from agent_eval.memory_poison import SCENARIOS_BY_ID, BUILTIN_SCENARIOS, run_memory_poison
     from agent_eval.runners.llm_runner import LLMAgentRunner, LLMConfig
 
     _store.update_safety_eval(safety_id, status="running")
+    scenarios = [SCENARIOS_BY_ID[scenario_id]] if scenario_id and scenario_id in SCENARIOS_BY_ID else BUILTIN_SCENARIOS
+    total = len(scenarios)
+    _memory_progress[safety_id] = {
+        "phase": "init", "scenario_idx": 0, "scenario_total": total,
+        "message": "初始化评测环境…", "phases_done": [],
+    }
     try:
         base_task = DEMO_TASKS_BY_ID.get(task_id) or list(DEMO_TASKS_BY_ID.values())[0]
-        scenarios = [SCENARIOS_BY_ID[scenario_id]] if scenario_id and scenario_id in SCENARIOS_BY_ID else BUILTIN_SCENARIOS
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
         runner = LLMAgentRunner(cfg)
-        results = [run_memory_poison(s, runner, base_task) for s in scenarios]
 
-        # Contamination curve
-        from itertools import groupby
+        results = []
+        for idx, s in enumerate(scenarios):
+            _memory_progress[safety_id]["scenario_idx"] = idx
+
+            def _cb(phase: str, message: str) -> None:
+                _memory_progress[safety_id].update({
+                    "phase": phase,
+                    "message": f"场景 {idx + 1}/{total}  {message}",
+                })
+                if phase not in _memory_progress[safety_id]["phases_done"]:
+                    _memory_progress[safety_id]["phases_done"].append(phase)
+
+            results.append(run_memory_poison(s, runner, base_task, progress_cb=_cb))
+
+        _memory_progress[safety_id].update({
+            "phase": "done",
+            "scenario_idx": total,
+            "message": "计算污染曲线，保存结果…",
+        })
+
         asr_total = sum(1 for r in results if r.agent_took_malicious_action)
         mean_asr = asr_total / len(results) if results else 0.0
         curve = [
@@ -402,6 +443,8 @@ def _run_memory_poison_bg(safety_id, scenario_id, task_id, model, api_key, base_
         _store.update_safety_eval(safety_id, status="done")
     except Exception as exc:
         _store.update_safety_eval(safety_id, status="error", error=str(exc))
+    finally:
+        _memory_progress.pop(safety_id, None)
 
 
 @router.get("/memory-poison/scenarios")

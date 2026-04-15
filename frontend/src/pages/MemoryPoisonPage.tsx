@@ -6,12 +6,31 @@
  *
  * Reference: AgentPoison (Chen et al., NeurIPS 2024, arXiv:2407.12513)
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type SafetyEval } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
 
 const BASE = "/api/v1/agent-eval";
+
+interface MemoryProgress {
+  safety_id: string;
+  status: string;
+  phase: string;
+  scenario_idx: number;
+  scenario_total: number;
+  message: string;
+  phases_done: string[];
+}
+
+const PHASE_DEFS = [
+  { id: "init",       label: "初始化环境",   desc: "准备基础任务与 Agent Runner" },
+  { id: "setup",      label: "写入正常记忆", desc: "向记忆系统注入合法背景条目" },
+  { id: "poison",     label: "注入毒化条目", desc: "按投毒率写入恶意指令" },
+  { id: "run_agent",  label: "执行 Agent",   desc: "Agent 调用 recall 工具并执行任务" },
+  { id: "analyze",    label: "分析场景结果", desc: "判断是否召回毒化记忆并执行攻击者意图" },
+  { id: "done",       label: "汇总完成",     desc: "计算 ASR 污染曲线，保存结果" },
+];
 
 interface ScenarioResult {
   scenario_id: string;
@@ -50,19 +69,49 @@ export default function MemoryPoisonPage() {
   const [running, setRunning] = useState(false);
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<MemoryPoisonResult | null>(null);
+  const [progress, setProgress] = useState<MemoryProgress | null>(null);
+  const progressLog = useRef<string[]>([]);
+  const [history, setHistory] = useState<SafetyEval[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     fetchScenarios().then(s => { setScenarios(s); if (s[0]) setSelectedScenario(s[0].scenario_id); });
+    api.listSafetyEvals("memory_poison", 20).then(setHistory).catch(() => {});
   }, []);
 
   useEffect(() => {
+    setCurrentEval(null);
+    setResult(null);
+    setProgress(null);
+    progressLog.current = [];
+  }, [safety_id]);
+
+  useEffect(() => {
     if (!safety_id) return;
-    const poll = () => api.getSafetyEval(safety_id).then((ev) => {
-      setCurrentEval(ev);
-      if (ev.status === "done") api.getSafetyResult(safety_id).then(setResult as any).catch(() => {});
-    }).catch(() => {});
-    poll();
-    const iv = setInterval(poll, 3000);
+
+    const pollStatus = () =>
+      api.getSafetyEval(safety_id).then((ev) => {
+        setCurrentEval(ev);
+        if (ev.status === "done") {
+          api.getSafetyResult(safety_id).then(setResult as any).catch(() => {});
+          api.listSafetyEvals("memory_poison", 20).then(setHistory).catch(() => {});
+        }
+      }).catch(() => {});
+
+    const pollProgress = () =>
+      fetch(`${BASE}/safety-evals/memory-poison/${safety_id}/progress`)
+        .then(r => r.ok ? r.json() : null)
+        .then((p: MemoryProgress | null) => {
+          if (!p) return;
+          setProgress(p);
+          if (p.message && !progressLog.current.includes(p.message)) {
+            progressLog.current = [...progressLog.current.slice(-19), p.message];
+          }
+        }).catch(() => {});
+
+    pollStatus();
+    pollProgress();
+    const iv = setInterval(() => { pollStatus(); pollProgress(); }, 1500);
     return () => clearInterval(iv);
   }, [safety_id]);
 
@@ -163,20 +212,80 @@ export default function MemoryPoisonPage() {
           </div>
         )}
 
-        {/* Status */}
+        {/* Status + phased progress */}
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-gray-800">检测状态</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                currentEval.status === "done" ? "bg-green-100 text-green-700" :
+          <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+            {/* Header row */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-slate-900">检测进度</span>
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                currentEval.status === "done"  ? "bg-green-100 text-green-700" :
                 currentEval.status === "error" ? "bg-red-100 text-red-700" :
-                "bg-blue-100 text-blue-700 animate-pulse"
+                "bg-orange-100 text-orange-700 animate-pulse"
               }`}>
                 {currentEval.status === "done" ? "已完成" : currentEval.status === "error" ? "出错" : "运行中"}
               </span>
+              {progress && progress.scenario_total > 0 && currentEval.status !== "done" && (
+                <span className="ml-auto text-xs text-slate-500">
+                  场景 {Math.min(progress.scenario_idx + 1, progress.scenario_total)} / {progress.scenario_total}
+                </span>
+              )}
             </div>
-            {currentEval.error && <p className="text-xs text-red-600">{currentEval.error}</p>}
+
+            {currentEval.error && (
+              <p className="text-xs text-red-600 bg-red-50 rounded p-2">{currentEval.error}</p>
+            )}
+
+            {/* Phase steps */}
+            {currentEval.status !== "error" && (
+              <div className="space-y-1.5">
+                {PHASE_DEFS.map((ph, i) => {
+                  const done = progress?.phases_done?.includes(ph.id)
+                    || (currentEval.status === "done");
+                  const active = progress?.phase === ph.id && currentEval.status !== "done";
+                  const pending = !done && !active;
+                  return (
+                    <div key={ph.id} className={`flex items-start gap-3 rounded-lg px-3 py-2 transition-all ${
+                      active  ? "bg-orange-50 border border-orange-200" :
+                      done    ? "bg-slate-50" :
+                      "opacity-40"
+                    }`}>
+                      {/* Circle */}
+                      <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                        done   ? "bg-green-500 text-white" :
+                        active ? "bg-orange-500 text-white animate-pulse" :
+                        "bg-slate-200 text-slate-500"
+                      }`}>
+                        {done ? "✓" : active ? "▶" : i + 1}
+                      </div>
+                      {/* Text */}
+                      <div className="min-w-0">
+                        <p className={`text-xs font-semibold ${
+                          done ? "text-slate-700" : active ? "text-orange-800" : "text-slate-400"
+                        }`}>{ph.label}</p>
+                        <p className={`text-[10px] leading-relaxed ${
+                          active ? "text-orange-600" : "text-slate-400"
+                        }`}>{ph.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Live message log */}
+            {currentEval.status === "running" && progressLog.current.length > 0 && (
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">实时日志</p>
+                <div className="space-y-0.5 max-h-28 overflow-y-auto">
+                  {[...progressLog.current].reverse().map((msg, i) => (
+                    <p key={i} className={`text-[10px] font-mono ${i === 0 ? "text-orange-700 font-semibold" : "text-slate-400"}`}>
+                      {i === 0 ? "▶ " : "· "}{msg}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -223,6 +332,58 @@ export default function MemoryPoisonPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* History panel */}
+        {history.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <button
+              onClick={() => setHistoryOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+            >
+              <span>历史记录 <span className="ml-1.5 text-xs font-normal text-slate-500">{history.length} 次测评</span></span>
+              <span className="text-slate-400 text-xs">{historyOpen ? "▲ 收起" : "▼ 展开"}</span>
+            </button>
+
+            {historyOpen && (
+              <div className="divide-y divide-slate-100 border-t border-slate-100">
+                {history.map(h => {
+                  const isActive = h.safety_id === safety_id;
+                  return (
+                    <button
+                      key={h.safety_id}
+                      onClick={() => navigate(`/safety/memory-poison/${h.safety_id}`)}
+                      className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors ${isActive ? "bg-orange-50" : ""}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        h.status === "done"    ? "bg-green-500" :
+                        h.status === "error"   ? "bg-red-400" :
+                        h.status === "running" ? "bg-orange-400 animate-pulse" :
+                        "bg-slate-300"
+                      }`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-800 truncate">
+                          {h.safety_id}
+                          {isActive && <span className="ml-2 text-orange-600 font-normal">当前</span>}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {h.model} · {h.created_at ? new Date(h.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
+                        h.status === "done"    ? "bg-green-100 text-green-700" :
+                        h.status === "error"   ? "bg-red-100 text-red-700" :
+                        h.status === "running" ? "bg-orange-100 text-orange-700" :
+                        "bg-slate-100 text-slate-500"
+                      }`}>
+                        {h.status === "done" ? "完成" : h.status === "error" ? "出错" : h.status === "running" ? "运行中" : "待运行"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
     </div>

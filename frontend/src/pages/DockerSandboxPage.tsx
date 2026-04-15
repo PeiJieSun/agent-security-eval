@@ -260,19 +260,74 @@ export default function DockerSandboxPage() {
           </div>
 
           {/* Architecture note */}
-          <div className="mt-4 border border-dashed border-gray-200 rounded p-4">
-            <p className="text-xs font-medium text-gray-500 mb-2">沙箱架构（M5-1）</p>
-            <pre className="text-xs text-gray-400 leading-5">{`
-Agent Code → Docker Container (network=none)
-  ↓ Tool calls via JSON-RPC
-Tool Server (host) → Inject IPI payload → Return to agent
-  ↓ Tool call log
-Trajectory Recorder → Oracle → verdict: safe | compromised
-`.trim()}</pre>
-            <p className="text-xs text-gray-400 mt-2">
-              真实 Docker 模式需要 <code className="bg-gray-100 px-1 rounded">DOCKER_AVAILABLE=true</code> 环境变量
-              及镜像 <code className="bg-gray-100 px-1 rounded">agent-security-eval/sandbox:latest</code>
-            </p>
+          <div className="mt-6 border border-slate-200 rounded-xl bg-slate-50 p-6 overflow-hidden">
+            <div className="flex items-center justify-between mb-8">
+              <p className="text-sm font-bold text-slate-800 tracking-wide">沙箱执行架构 (M5-1)</p>
+              <div className="flex gap-2">
+                <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded">DOCKER_AVAILABLE=true</span>
+                <span className="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded">agent-security-eval/sandbox:latest</span>
+              </div>
+            </div>
+
+            <div className="relative">
+              {/* Flow diagram */}
+              <div className="flex items-center gap-4 lg:gap-8">
+                {/* Agent */}
+                <div className="w-[160px] bg-white border border-blue-200 rounded-xl shadow-sm p-5 text-center z-10">
+                  <div className="w-12 h-12 mx-auto bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  </div>
+                  <p className="text-sm font-bold text-slate-700">Agent 容器</p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-mono bg-slate-50 rounded border py-0.5">--network=none</p>
+                </div>
+
+                {/* JSON-RPC */}
+                <div className="flex-1 flex flex-col items-center justify-center relative">
+                  <div className="w-full absolute top-1/2 left-0 -mt-px border-t border-slate-300 border-dashed" />
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full uppercase tracking-widest z-10 relative mb-1">JSON-RPC</span>
+                  <div className="w-full flex justify-between px-2 text-slate-400 z-10 relative">
+                     <span className="text-[10px] bg-slate-50 px-1">◀ 结果</span>
+                     <span className="text-[10px] bg-slate-50 px-1">工具 ▶</span>
+                  </div>
+                </div>
+
+                {/* Tool Server */}
+                <div className="w-[180px] bg-white border border-amber-200 rounded-xl shadow-sm p-5 text-center z-10 relative">
+                  <div className="w-12 h-12 mx-auto bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>
+                  </div>
+                  <p className="text-sm font-bold text-slate-700">拦截与注入</p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-mono">Host Tool Server</p>
+                  
+                  {/* Arrow down to recorder */}
+                  <div className="absolute -bottom-10 left-1/2 -ml-px w-px h-10 border-l-2 border-slate-300 border-dotted z-0" />
+                  <div className="absolute -bottom-6 left-1/2 ml-2 text-[10px] font-bold text-slate-400 z-10">轨迹日志 ↓</div>
+                </div>
+              </div>
+
+              {/* Trajectory */}
+              <div className="mt-10 flex justify-end">
+                <div className="w-[260px] bg-slate-800 text-white rounded-xl shadow-lg p-4 flex items-center gap-4 relative z-10">
+                  <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-200">轨迹判定 (Oracle)</p>
+                    <p className="text-[11px] text-emerald-400 mt-0.5 font-mono">verdict: safe | compromised</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-200 flex items-start gap-3">
+              <svg className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div>
+                <p className="text-xs text-slate-600 font-medium">使用说明与权限 (OrbStack 支持)</p>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  沙箱依赖本机 <code className="bg-white border px-1 rounded">docker</code> 命令行工具。由于您使用 OrbStack，它已自动接管 Docker 进程，因此<strong>无需额外配置权限</strong>，保持 OrbStack 后台运行即可。若需开启真实测试，请先拉取或构建沙箱镜像，并在启动后端时注入环境变量开启实体沙箱。
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
