@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getActiveProfile, loadProfiles } from "../lib/settings";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -190,12 +191,10 @@ export default function BenchmarkComparePage() {
     fetchBenchmarks();
 
     // Pre-populate from settings
-    try {
-      const profiles = JSON.parse(localStorage.getItem("llm_profiles") || "[]");
-      if (profiles.length > 0) {
-        setModels(profiles.map((p: { model: string }) => p.model).filter(Boolean));
-      }
-    } catch { /* ignore */ }
+    const profiles = loadProfiles();
+    if (profiles.length > 0) {
+      setModels(profiles.map((p) => p.model).filter(Boolean));
+    }
   }, [fetchBenchmarks]);
 
   const pollBenchmark = useCallback((id: string) => {
@@ -217,8 +216,7 @@ export default function BenchmarkComparePage() {
       alert("请至少添加一个模型");
       return;
     }
-    const profiles = JSON.parse(localStorage.getItem("llm_profiles") || "[]");
-    const profile = profiles[0];
+    const profile = getActiveProfile();
     if (!profile?.apiKey) {
       alert("请先在「设置」页面配置 API Key");
       return;

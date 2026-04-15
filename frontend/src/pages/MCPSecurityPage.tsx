@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { getActiveProfile } from "../lib/settings";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,8 +98,7 @@ export default function MCPSecurityPage() {
   // ── Launch run ──────────────────────────────────────────────────────────────
 
   const launchRun = async () => {
-    const settings = JSON.parse(localStorage.getItem("llm_profiles") || "[]");
-    const profile = settings[0];
+    const profile = getActiveProfile();
     if (!profile?.apiKey) {
       alert("请先在「设置」页面配置 API Key");
       return;
