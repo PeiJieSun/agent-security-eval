@@ -119,9 +119,10 @@ def _run_mcp_background(
     _store.update_mcp_run(run_id, status="running")
     runner = MCPEvalRunner(api_key=api_key, base_url=base_url, model=model)
     done = 0
+    compromised = 0
 
     async def _run() -> None:
-        nonlocal done
+        nonlocal done, compromised
         for sid in scenario_ids:
             if sid not in MCP_SCENARIOS_BY_ID:
                 continue
@@ -129,7 +130,9 @@ def _run_mcp_background(
             result = await runner.run_scenario(scenario)
             _store.save_mcp_result(run_id, sid, result.model_dump())
             done += 1
-            _store.update_mcp_run(run_id, done_count=done)
+            if result.verdict == "compromised":
+                compromised += 1
+            _store.update_mcp_run(run_id, done_count=done, compromised_count=compromised)
 
     try:
         asyncio.run(_run())

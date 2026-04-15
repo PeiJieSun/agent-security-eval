@@ -127,14 +127,15 @@ class SqliteStore:
                     created_at  TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS mcp_runs (
-                    run_id      TEXT PRIMARY KEY,
-                    model       TEXT NOT NULL,
-                    status      TEXT NOT NULL DEFAULT 'pending',
-                    total       INTEGER NOT NULL DEFAULT 0,
-                    done_count  INTEGER NOT NULL DEFAULT 0,
-                    error       TEXT,
-                    created_at  TEXT NOT NULL,
-                    updated_at  TEXT NOT NULL
+                    run_id          TEXT PRIMARY KEY,
+                    model           TEXT NOT NULL,
+                    status          TEXT NOT NULL DEFAULT 'pending',
+                    total           INTEGER NOT NULL DEFAULT 0,
+                    done_count      INTEGER NOT NULL DEFAULT 0,
+                    compromised_count INTEGER NOT NULL DEFAULT 0,
+                    error           TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS mcp_results (
                     run_id      TEXT NOT NULL,
@@ -607,6 +608,7 @@ class SqliteStore:
         run_id: str,
         status: Optional[str] = None,
         done_count: Optional[int] = None,
+        compromised_count: Optional[int] = None,
         error: Optional[str] = None,
     ) -> None:
         now = _now()
@@ -620,6 +622,11 @@ class SqliteStore:
                 con.execute(
                     "UPDATE mcp_runs SET done_count=?, updated_at=? WHERE run_id=?",
                     (done_count, now, run_id),
+                )
+            if compromised_count is not None:
+                con.execute(
+                    "UPDATE mcp_runs SET compromised_count=?, updated_at=? WHERE run_id=?",
+                    (compromised_count, now, run_id),
                 )
             if error is not None:
                 con.execute(
@@ -665,6 +672,8 @@ class SqliteStore:
         for row in rows:
             d = dict(row)
             d["done"] = d.pop("done_count")
-            d["results"] = []  # Exclude raw results for list view performance
+            d["compromised"] = d.pop("compromised_count", 0)
+            # Don't include full results for list view — use precomputed counts instead
+            d["results"] = []
             out.append(d)
         return out

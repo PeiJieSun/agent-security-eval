@@ -37,6 +37,7 @@ interface MCPRun {
   status: string;
   total: number;
   done: number;
+  compromised: number;   // precomputed count from DB row
   results: MCPResult[];
   created_at: string;
   error?: string;
@@ -360,12 +361,22 @@ export default function MCPSecurityPage() {
           ) : (
             <div className="divide-y divide-gray-100 border border-gray-200 rounded">
               {runs.map((r) => {
-                const { total, compromised, asr } = summaryStats(r.results);
+                const asr = r.total > 0 ? ((r.compromised / r.total) * 100).toFixed(1) : "—";
                 return (
                   <div
                     key={r.run_id}
                     className="p-4 cursor-pointer hover:bg-gray-50"
-                    onClick={() => { setCurrentRun(r); setActiveTab("results"); }}
+                    onClick={async () => {
+                      setActiveTab("results");
+                      // Fetch full run with results from API
+                      try {
+                        const res = await fetch(`${API}/runs/${r.run_id}`);
+                        const full = await res.json();
+                        setCurrentRun(full);
+                      } catch {
+                        setCurrentRun(r);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -377,8 +388,8 @@ export default function MCPSecurityPage() {
                         }`}>{r.status}</span>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-gray-400">
-                        <span>{total} 场景</span>
-                        <span className="text-red-500">{compromised} 攻陷</span>
+                        <span>{r.total} 场景</span>
+                        <span className="text-red-500">{r.compromised} 攻陷</span>
                         <span>ASR {asr}%</span>
                         <span>{new Date(r.created_at).toLocaleString("zh-CN")}</span>
                       </div>
