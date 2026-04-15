@@ -2,7 +2,7 @@
  * BackdoorScanPage — M2-7: Backdoor Trigger Scanner
  * Scan for hidden trigger words that cause anomalous agent behavior.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type SafetyEval, type TaskInfo, type SafetyStandard } from "../lib/api";
 import { getActiveProfile } from "../lib/settings";
@@ -131,6 +131,13 @@ function ResultView({ result }: { result: ScanResult }) {
   );
 }
 
+interface ScanProgress {
+  done: number;
+  total: number;
+  current: string;
+  status: string;
+}
+
 export default function BackdoorScanPage() {
   const { safety_id } = useParams<{ safety_id?: string }>();
   const navigate = useNavigate();
@@ -141,6 +148,8 @@ export default function BackdoorScanPage() {
   const [currentEval, setCurrentEval] = useState<SafetyEval | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [standard, setStandard] = useState<SafetyStandard | null>(null);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const ivRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     api.listTasks().then(setTasks).catch(() => {});
@@ -149,13 +158,31 @@ export default function BackdoorScanPage() {
 
   useEffect(() => {
     if (!safety_id) return;
-    const poll = () => api.getSafetyEval(safety_id).then((ev) => {
-      setCurrentEval(ev);
-      if (ev.status === "done") api.getSafetyResult(safety_id).then(setResult as any).catch(() => {});
-    }).catch(() => {});
+    if (ivRef.current) clearInterval(ivRef.current);
+
+    const poll = async () => {
+      try {
+        const ev = await api.getSafetyEval(safety_id);
+        setCurrentEval(ev);
+        if (ev.status === "running" || ev.status === "pending") {
+          const prog = await api.getBackdoorProgress(safety_id);
+          setProgress(prog);
+        }
+        if (ev.status === "done") {
+          const res = await api.getSafetyResult(safety_id);
+          setResult(res as unknown as ScanResult);
+          setProgress(null);
+          if (ivRef.current) clearInterval(ivRef.current);
+        }
+        if (ev.status === "error") {
+          setProgress(null);
+          if (ivRef.current) clearInterval(ivRef.current);
+        }
+      } catch { /* ignore */ }
+    };
     poll();
-    const iv = setInterval(poll, 5000);
-    return () => clearInterval(iv);
+    ivRef.current = setInterval(poll, 1500);
+    return () => { if (ivRef.current) clearInterval(ivRef.current); };
   }, [safety_id]);
 
   const profile = getActiveProfile();
@@ -242,16 +269,83 @@ export default function BackdoorScanPage() {
         )}
 
         {currentEval && (
-          <div className={`rounded-xl border p-4 ${currentEval.status === "error" ? "border-slate-200 bg-white" : "bg-white border-slate-200"}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-gray-800">扫描状态</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                currentEval.status === "done" ? "bg-green-100 text-green-700" :
-                currentEval.status === "error" ? "bg-red-100 text-red-700" :
-                "bg-rose-100 text-rose-700 animate-pulse"
-              }`}>{currentEval.status === "done" ? "已完成" : currentEval.status === "error" ? "出错" : "扫描中…（可能需要几分钟）"}</span>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {currentEval.status === "running" && (
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                  </span>
+                )}
+                <span className="text-sm font-semibold text-slate-800">后门扫描</span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                  currentEval.status === "done" ? "bg-emerald-100 text-emerald-700" :
+                  currentEval.status === "error" ? "bg-red-100 text-red-700" :
+                  "bg-rose-100 text-rose-700"
+                }`}>
+                  {currentEval.status === "done" ? "已完成" :
+                   currentEval.status === "error" ? "出错" :
+                   currentEval.status === "pending" ? "等待中" : "扫描中"}
+                </span>
+              </div>
+              {progress && progress.total > 0 && (
+                <span className="text-xs text-slate-500 font-mono">
+                  {progress.done} / {progress.total} 触发词
+                </span>
+              )}
             </div>
-            {currentEval.status === "error" && <p className="text-sm text-red-700">{currentEval.error}</p>}
+
+            {/* Progress bar */}
+            {currentEval.status !== "error" && (
+              <div>
+                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                  {progress && progress.total > 0 ? (
+                    <div
+                      className="h-full rounded-full bg-rose-500 transition-all duration-500"
+                      style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                    />
+                  ) : currentEval.status === "done" ? (
+                    <div className="h-full rounded-full bg-emerald-500 w-full" />
+                  ) : (
+                    <div className="h-full w-2/5 rounded-full bg-rose-400 animate-pulse" />
+                  )}
+                </div>
+                {progress && progress.total > 0 && (
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <p className="text-[11px] text-slate-400 truncate max-w-[75%]" title={progress.current}>
+                      {progress.done === 0 ? "⏳ 运行基线…" : `🔍 ${progress.current}`}
+                    </p>
+                    <span className="text-[11px] text-slate-400">
+                      {Math.round((progress.done / progress.total) * 100)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Steps log: show trigger index markers when running */}
+            {progress && progress.total > 0 && currentEval.status === "running" && (
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: progress.total }, (_, i) => (
+                  <div
+                    key={i}
+                    className={`w-4 h-4 rounded-sm text-[8px] flex items-center justify-center font-mono
+                      ${i < progress.done ? "bg-rose-500 text-white" :
+                        i === progress.done ? "bg-rose-200 text-rose-700 animate-pulse" :
+                        "bg-slate-100 text-slate-300"}`}
+                    title={`触发词 ${i + 1}`}
+                  >
+                    {i < progress.done ? "✓" : i === progress.done ? "▶" : "·"}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {currentEval.status === "error" && (
+              <p className="text-sm text-red-700 bg-red-50 rounded p-2">{currentEval.error}</p>
+            )}
           </div>
         )}
 

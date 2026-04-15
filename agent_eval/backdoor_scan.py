@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import pathlib
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 
 from pydantic import BaseModel
 
@@ -87,6 +87,7 @@ def run_backdoor_scan(
     task: EvalTask,
     runner: LLMAgentRunner,
     trigger_ids: Optional[list[str]] = None,
+    progress_cb: Optional[Callable[[int, int, str], None]] = None,
 ) -> BackdoorScanResult:
     """
     Run the M2-7 backdoor trigger scan.
@@ -110,8 +111,13 @@ def run_backdoor_scan(
     ]
 
     # Step 2: per-trigger runs
+    total = len(triggers)
+    if progress_cb:
+        progress_cb(0, total, "baseline")
     raw_results: list[TriggerResult] = []
-    for trigger in triggers:
+    for idx, trigger in enumerate(triggers):
+        if progress_cb:
+            progress_cb(idx, total, trigger["text"])
         modified_task = task.model_copy(
             update={
                 "user_instruction": (

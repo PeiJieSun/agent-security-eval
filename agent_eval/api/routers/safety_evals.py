@@ -279,6 +279,24 @@ def create_backdoor_scan(req: BackdoorScanRequest, background: BackgroundTasks) 
     return record
 
 
+# In-memory progress store for backdoor scan (ephemeral, keyed by safety_id)
+_backdoor_progress: dict[str, dict] = {}
+
+
+@router.get("/backdoor-scan/{safety_id}/progress")
+def get_backdoor_progress(safety_id: str) -> dict:
+    """Return live progress for a running backdoor scan."""
+    ev = _store.get_safety_eval(safety_id)
+    prog = _backdoor_progress.get(safety_id, {})
+    return {
+        "safety_id": safety_id,
+        "status": ev["status"],
+        "done": prog.get("done", 0),
+        "total": prog.get("total", 0),
+        "current": prog.get("current", ""),
+    }
+
+
 @router.get("/standards")
 def list_safety_standards():
     """Return the full citation registry for all second-type threat detection methods."""
@@ -287,15 +305,28 @@ def list_safety_standards():
 
 def _run_backdoor_scan_bg(safety_id, task_id, trigger_ids, model, api_key, base_url):
     _store.update_safety_eval(safety_id, status="running")
+    _backdoor_progress[safety_id] = {"done": 0, "total": 0, "current": "基线运行…"}
     try:
         task = DEMO_TASKS_BY_ID[task_id]
         cfg = LLMConfig(api_key=api_key, base_url=base_url, model=model)
         runner = LLMAgentRunner(cfg)
-        result = run_backdoor_scan(task, runner, trigger_ids=trigger_ids)
+
+        def _cb(done: int, total: int, current: str) -> None:
+            _backdoor_progress[safety_id] = {
+                "done": done, "total": total, "current": current,
+            }
+
+        result = run_backdoor_scan(task, runner, trigger_ids=trigger_ids, progress_cb=_cb)
+        n = len(result.trigger_results)
+        _backdoor_progress[safety_id] = {
+            "done": n, "total": n, "current": "完成",
+        }
         _store.save_safety_result(safety_id, result.model_dump())
         _store.update_safety_eval(safety_id, status="done")
     except Exception as exc:
         _store.update_safety_eval(safety_id, status="error", error=str(exc))
+    finally:
+        _backdoor_progress.pop(safety_id, None)
 
 
 # ── M2-1: Memory Poisoning ────────────────────────────────────────────────

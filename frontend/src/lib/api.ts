@@ -209,6 +209,10 @@ export const api = {
     req<SafetyEval>("/safety-evals/cot-audit", { method: "POST", body: JSON.stringify(body) }),
   createBackdoorScan: (body: { task_id: string; trigger_ids?: string[]; model?: string; api_key?: string; base_url?: string }) =>
     req<SafetyEval>("/safety-evals/backdoor-scan", { method: "POST", body: JSON.stringify(body) }),
+  getBackdoorProgress: (safety_id: string) =>
+    req<{ safety_id: string; status: string; done: number; total: number; current: string }>(
+      `/safety-evals/backdoor-scan/${safety_id}/progress`
+    ),
   listConsistencyTasks: () => req<ConsistencyTaskInfo[]>("/safety-evals/consistency-tasks/list"),
 
   // Safety standards citation registry
