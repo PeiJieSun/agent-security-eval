@@ -135,15 +135,15 @@ export default function ToolCallGraphPage() {
 
           {/* Tabs */}
           <div>
-            <div className="flex gap-0 border-b border-slate-200 mb-4">
+            <div className="flex gap-2 border-b border-slate-200 mb-5">
               {(["visual", "edges", "paths", "nodes"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+                  className={`px-4 py-2.5 text-[13px] font-semibold transition-colors border-b-2 -mb-px ${
                     activeTab === tab
                       ? "border-slate-900 text-slate-900"
-                      : "border-transparent text-slate-400 hover:text-slate-600"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   {tab === "visual" ? "可视化图" : tab === "edges" ? "转移边" : tab === "paths" ? "TopK 路径" : "节点"}
@@ -158,46 +158,69 @@ export default function ToolCallGraphPage() {
 
             {/* Edges tab */}
             {activeTab === "edges" && (
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-5 py-2 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                  <span>来源工具</span><span>目标工具</span><span>频次</span><span>转移率</span>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-6 py-3 border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                  <span>来源工具</span><span>目标工具</span><span className="text-right w-12">频次</span><span className="text-right w-16">转移率</span>
                 </div>
-                {graph.edges.slice(0, 30).map((e, i) => (
-                  <div
-                    key={i}
-                    className={`grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-5 py-2.5 text-xs ${i < graph.edges.length - 1 ? "border-b border-slate-50" : ""}`}
-                  >
-                    <span className={`font-mono ${graph.high_risk_tools_found.some(t => t.name === e.from_tool) ? "text-red-600" : "text-slate-700"}`}>
-                      {e.from_tool}
-                    </span>
-                    <span className={`font-mono ${graph.high_risk_tools_found.some(t => t.name === e.to_tool) ? "text-red-600" : "text-slate-600"}`}>
-                      → {e.to_tool}
-                    </span>
-                    <span className="text-slate-600 tabular-nums">{e.weight}</span>
-                    <span className="text-slate-400 tabular-nums">{(e.transition_rate * 100).toFixed(0)}%</span>
-                  </div>
-                ))}
+                <div className="divide-y divide-slate-100">
+                  {graph.edges.slice(0, 30).map((e, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-6 py-3.5 text-[13px] hover:bg-slate-50 transition-colors items-center"
+                    >
+                      <div className="flex items-center">
+                        <span className={`font-mono font-medium px-2.5 py-1 rounded-md border shadow-sm ${
+                          graph.high_risk_tools_found.some(t => t.name === e.from_tool) 
+                            ? "bg-red-50 text-red-700 border-red-200" 
+                            : "bg-white text-slate-900 border-slate-200"
+                        }`}>
+                          {e.from_tool}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <svg className="w-3.5 h-3.5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className={`font-mono font-medium px-2.5 py-1 rounded-md border shadow-sm ${
+                          graph.high_risk_tools_found.some(t => t.name === e.to_tool) 
+                            ? "bg-red-50 text-red-700 border-red-200" 
+                            : "bg-white text-slate-900 border-slate-200"
+                        }`}>
+                          {e.to_tool}
+                        </span>
+                      </div>
+                      <span className="text-slate-900 font-semibold tabular-nums text-right w-12">{e.weight}</span>
+                      <span className="text-slate-500 font-medium tabular-nums text-right w-16">{(e.transition_rate * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Paths tab */}
             {activeTab === "paths" && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {graph.top_paths.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-8">暂无路径数据（需要更多轨迹）</p>
+                  <p className="text-[13px] text-slate-500 text-center py-10 bg-white rounded-xl border border-slate-200 shadow-sm">暂无路径数据（需要更多轨迹）</p>
                 ) : graph.top_paths.map((path, i) => (
-                  <div key={i} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-[10px] text-slate-400 w-4 shrink-0">#{i + 1}</span>
+                  <div key={i} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:border-slate-300 transition-colors">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-xs shrink-0 shadow-inner border border-slate-200/50">
+                      #{i + 1}
+                    </div>
+                    <div className="flex items-center flex-wrap gap-x-1.5 gap-y-2">
                       {path.map((tool, j) => (
-                        <span key={j} className="flex items-center gap-1">
-                          <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${
+                        <div key={j} className="flex items-center">
+                          <span className={`text-[12px] px-2.5 py-1 rounded-md font-mono font-medium border shadow-sm ${
                             graph.high_risk_tools_found.some(hrt => hrt.name === tool)
-                              ? "bg-red-50 text-red-700 border border-red-200"
-                              : "bg-slate-100 text-slate-700"
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : "bg-white text-slate-900 border-slate-200"
                           }`}>{tool}</span>
-                          {j < path.length - 1 && <span className="text-slate-300 text-xs">→</span>}
-                        </span>
+                          {j < path.length - 1 && (
+                            <svg className="w-3.5 h-3.5 mx-1.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -207,22 +230,41 @@ export default function ToolCallGraphPage() {
 
             {/* Nodes tab */}
             {activeTab === "nodes" && (
-              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-2 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                  <span>工具名称</span><span>调用次数</span><span>风险级别</span>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-6 py-3 border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                  <span>工具名称</span><span className="text-right w-16">调用次数</span><span className="text-center w-16">风险级别</span>
                 </div>
-                {graph.nodes.map((n, i) => (
-                  <div
-                    key={n.id}
-                    className={`grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-2.5 text-xs ${i < graph.nodes.length - 1 ? "border-b border-slate-50" : ""}`}
-                  >
-                    <span className={`font-mono ${n.is_high_risk ? "text-red-600" : "text-slate-700"}`}>{n.id}</span>
-                    <span className="text-slate-600 tabular-nums">{n.count}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${n.is_high_risk ? "bg-red-50 text-red-600 border border-red-200" : "bg-slate-50 text-slate-400"}`}>
-                      {n.is_high_risk ? "高危" : "普通"}
-                    </span>
-                  </div>
-                ))}
+                <div className="divide-y divide-slate-100">
+                  {graph.nodes.map((n, i) => (
+                    <div
+                      key={n.id}
+                      className="grid grid-cols-[1fr_auto_auto] gap-4 px-6 py-3.5 text-[13px] hover:bg-slate-50 transition-colors items-center"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`font-mono font-medium px-2.5 py-1 rounded-md border shadow-sm ${
+                          n.is_high_risk 
+                            ? "bg-red-50 text-red-700 border-red-200" 
+                            : "bg-white text-slate-900 border-slate-200"
+                        }`}>
+                          {n.id}
+                        </span>
+                        {n.is_high_risk && n.risk_reason && (
+                          <span className="text-[12px] text-slate-500 truncate max-w-sm hidden sm:block" title={n.risk_reason}>
+                            — {n.risk_reason}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-900 font-semibold tabular-nums text-right w-16">{n.count}</span>
+                      <div className="w-16 flex justify-center">
+                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border shadow-sm ${
+                          n.is_high_risk ? "bg-red-50 text-red-700 border-red-200" : "bg-white text-slate-500 border-slate-200"
+                        }`}>
+                          {n.is_high_risk ? "高危" : "普通"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
