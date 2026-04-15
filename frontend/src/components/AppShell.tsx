@@ -40,11 +40,21 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    heading: "防御",
+    items: [
+      { label: "安全网关", path: "/defense", desc: "运行时拦截、净化、频率限制、Kill Switch" },
+    ],
+  },
+  {
     heading: "工具 & 扩展",
     items: [
       { label: "长期趋势",    path: "/behavior/trend",    desc: "跨版本三维指标漂移与 KL 散度" },
       { label: "Docker 沙箱", path: "/sandbox",           desc: "隔离容器运行任意 agent 框架评测" },
       { label: "接入 Agent",  path: "/agent-connector",  desc: "任意 OpenAI 兼容 endpoint 接入" },
+      { label: "行业垂直包", path: "/verticals",        desc: "按行业预置攻击场景与合规映射" },
+      { label: "框架安全指纹", path: "/framework-fingerprints", desc: "LangChain/CrewAI/AutoGen/Dify 安全基线对比" },
+      { label: "二开审计", path: "/delta-audit", desc: "框架基线 vs 二开产物 A/B 安全对比" },
+      { label: "合规报告", path: "/compliance", desc: "等保/金融/NRC/HIPAA 行业合规审计" },
     ],
   },
 ];

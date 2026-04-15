@@ -20,6 +20,11 @@ from agent_eval.api.routers import safety_evals as safety_router
 from agent_eval.api.routers import mcp_eval as mcp_router
 from agent_eval.api.routers import sandbox as sandbox_router
 from agent_eval.api.routers import report as report_router
+from agent_eval.api.routers import verticals as verticals_router
+from agent_eval.api.routers import framework_fp as fp_router
+from agent_eval.api.routers import delta_audit as delta_router
+from agent_eval.api.routers import defense as defense_router
+from agent_eval.api.routers import compliance as compliance_router
 from agent_eval.storage.sqlite_store import SqliteStore
 
 app = FastAPI(
@@ -50,6 +55,11 @@ app.include_router(safety_router.router)
 app.include_router(mcp_router.router)
 app.include_router(sandbox_router.router)
 app.include_router(report_router.router)
+app.include_router(verticals_router.router)
+app.include_router(fp_router.router)
+app.include_router(delta_router.router)
+app.include_router(defense_router.router)
+app.include_router(compliance_router.router)
 
 
 @app.get("/health")

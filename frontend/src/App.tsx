@@ -25,6 +25,11 @@ import DockerSandboxPage from "./pages/DockerSandboxPage";
 import AgentConnectorPage from "./pages/AgentConnectorPage";
 import EvalFrameworksPage from "./pages/EvalFrameworksPage";
 import AgentReportPage from "./pages/AgentReportPage";
+import FrameworkFingerprintPage from "./pages/FrameworkFingerprintPage";
+import VerticalsPage from "./pages/VerticalsPage";
+import DefenseGatewayPage from "./pages/DefenseGatewayPage";
+import DeltaAuditPage from "./pages/DeltaAuditPage";
+import CompliancePage from "./pages/CompliancePage";
 
 export default function App() {
   return (
@@ -79,6 +84,16 @@ export default function App() {
           <Route path="/eval-frameworks" element={<EvalFrameworksPage />} />
           {/* Unified Agent Report */}
           <Route path="/report" element={<AgentReportPage />} />
+          {/* Framework Security Fingerprint */}
+          <Route path="/framework-fingerprints" element={<FrameworkFingerprintPage />} />
+          {/* Vertical Packs */}
+          <Route path="/verticals" element={<VerticalsPage />} />
+          {/* Delta Audit */}
+          <Route path="/delta-audit" element={<DeltaAuditPage />} />
+          {/* Compliance */}
+          <Route path="/compliance" element={<CompliancePage />} />
+          {/* Defense Gateway */}
+          <Route path="/defense" element={<DefenseGatewayPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
