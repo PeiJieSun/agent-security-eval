@@ -40,6 +40,13 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    heading: "深度分析",
+    items: [
+      { label: "源码审计", path: "/source-audit", desc: "AST 静态分析 Agent 框架特有漏洞" },
+      { label: "污点追踪", path: "/taint-analysis", desc: "Prompt Flow 中不可信数据传播链路追踪" },
+    ],
+  },
+  {
     heading: "防御",
     items: [
       { label: "安全网关", path: "/defense", desc: "运行时拦截、净化、频率限制、Kill Switch" },

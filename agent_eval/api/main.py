@@ -25,6 +25,8 @@ from agent_eval.api.routers import framework_fp as fp_router
 from agent_eval.api.routers import delta_audit as delta_router
 from agent_eval.api.routers import defense as defense_router
 from agent_eval.api.routers import compliance as compliance_router
+from agent_eval.api.routers import taint as taint_router
+from agent_eval.api.routers import source_audit as audit_router
 from agent_eval.storage.sqlite_store import SqliteStore
 
 app = FastAPI(
@@ -60,6 +62,8 @@ app.include_router(fp_router.router)
 app.include_router(delta_router.router)
 app.include_router(defense_router.router)
 app.include_router(compliance_router.router)
+app.include_router(audit_router.router)
+app.include_router(taint_router.router)
 
 
 @app.get("/health")

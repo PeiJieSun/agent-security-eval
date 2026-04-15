@@ -30,6 +30,8 @@ import VerticalsPage from "./pages/VerticalsPage";
 import DefenseGatewayPage from "./pages/DefenseGatewayPage";
 import DeltaAuditPage from "./pages/DeltaAuditPage";
 import CompliancePage from "./pages/CompliancePage";
+import SourceAuditPage from "./pages/SourceAuditPage";
+import TaintAnalysisPage from "./pages/TaintAnalysisPage";
 
 export default function App() {
   return (
@@ -92,6 +94,10 @@ export default function App() {
           <Route path="/delta-audit" element={<DeltaAuditPage />} />
           {/* Compliance */}
           <Route path="/compliance" element={<CompliancePage />} />
+          {/* Source Audit */}
+          <Route path="/source-audit" element={<SourceAuditPage />} />
+          {/* Taint Analysis */}
+          <Route path="/taint-analysis" element={<TaintAnalysisPage />} />
           {/* Defense Gateway */}
           <Route path="/defense" element={<DefenseGatewayPage />} />
         </Route>
