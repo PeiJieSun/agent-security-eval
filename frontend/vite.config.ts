@@ -11,6 +11,10 @@ export default defineConfig({
         target: "http://localhost:18002",
         changeOrigin: true,
       },
+      "/agent-report": {
+        target: "http://localhost:18002",
+        changeOrigin: true,
+      },
     },
   },
 });

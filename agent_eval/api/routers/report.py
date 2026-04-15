@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse
 from agent_eval.evaluation_frameworks import FRAMEWORKS_BY_ID
 from agent_eval.storage.sqlite_store import SqliteStore
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/agent-eval")
 _store = SqliteStore()
 
 # ── Mapping: framework dimension id → how to extract score ───────────────────

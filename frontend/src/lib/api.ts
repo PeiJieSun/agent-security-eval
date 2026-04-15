@@ -281,9 +281,9 @@ export const api = {
   listBehaviorTasks: () => req<{ task_id: string; snapshot_count: number }[]>("/behavior-trend/tasks"),
 
   // Agent Report (unified T1+T2+T3 scorecard)
-  getReportModels: () => fetch("/agent-report/models").then(r => r.json()) as Promise<string[]>,
+  getReportModels: () => req<string[]>("/agent-report/models"),
   getAgentReport: (model: string) =>
-    fetch(`/agent-report?model=${encodeURIComponent(model)}`).then(r => r.json()) as Promise<{
+    req<{
       model: string;
       overall: "pass" | "fail" | "not_run";
       scored: number;
@@ -303,7 +303,7 @@ export const api = {
         source_type: string;
         source_id: string | null;
       }[];
-    }>,
+    }>(`/agent-report?model=${encodeURIComponent(model)}`),
 
   // Backend settings persistence
   getSettings: () => req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>("/settings"),
