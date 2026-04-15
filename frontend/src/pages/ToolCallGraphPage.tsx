@@ -10,6 +10,7 @@ interface GraphNode {
   id: string;
   count: number;
   is_high_risk: boolean;
+  risk_reason?: string;
 }
 
 interface GraphEdge {
@@ -19,6 +20,11 @@ interface GraphEdge {
   transition_rate: number;
 }
 
+interface HighRiskTool {
+  name: string;
+  reason: string;
+}
+
 interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -26,7 +32,7 @@ interface GraphData {
   risk_coverage: number;
   total_trajectories: number;
   unique_tools: number;
-  high_risk_tools_found: string[];
+  high_risk_tools_found: HighRiskTool[];
   summary: string;
 }
 
@@ -108,15 +114,20 @@ export default function ToolCallGraphPage() {
 
           {/* High-risk tools found */}
           {graph.high_risk_tools_found.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                已发现高危工具
+            <div className="rounded-lg border border-red-200 bg-red-50/30 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-red-400 mb-3">
+                已发现高危工具调用
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {graph.high_risk_tools_found.map((t) => (
-                  <span key={t} className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded font-mono">
-                    {t}
-                  </span>
+                  <div key={t.name} className="flex flex-col p-2 bg-white rounded border border-red-100">
+                    <span className="text-[11px] text-red-700 font-mono font-bold mb-1">
+                      {t.name}
+                    </span>
+                    <span className="text-[10px] text-slate-500 leading-snug">
+                      {t.reason}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -156,10 +167,10 @@ export default function ToolCallGraphPage() {
                     key={i}
                     className={`grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-5 py-2.5 text-xs ${i < graph.edges.length - 1 ? "border-b border-slate-50" : ""}`}
                   >
-                    <span className={`font-mono ${e.from_tool in Object.fromEntries(graph.high_risk_tools_found.map(t => [t, true])) ? "text-red-600" : "text-slate-700"}`}>
+                    <span className={`font-mono ${graph.high_risk_tools_found.some(t => t.name === e.from_tool) ? "text-red-600" : "text-slate-700"}`}>
                       {e.from_tool}
                     </span>
-                    <span className={`font-mono ${graph.high_risk_tools_found.includes(e.to_tool) ? "text-red-600" : "text-slate-600"}`}>
+                    <span className={`font-mono ${graph.high_risk_tools_found.some(t => t.name === e.to_tool) ? "text-red-600" : "text-slate-600"}`}>
                       → {e.to_tool}
                     </span>
                     <span className="text-slate-600 tabular-nums">{e.weight}</span>
@@ -181,7 +192,7 @@ export default function ToolCallGraphPage() {
                       {path.map((tool, j) => (
                         <span key={j} className="flex items-center gap-1">
                           <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${
-                            graph.high_risk_tools_found.includes(tool)
+                            graph.high_risk_tools_found.some(hrt => hrt.name === tool)
                               ? "bg-red-50 text-red-700 border border-red-200"
                               : "bg-slate-100 text-slate-700"
                           }`}>{tool}</span>

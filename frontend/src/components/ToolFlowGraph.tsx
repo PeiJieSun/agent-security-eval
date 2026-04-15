@@ -5,7 +5,7 @@ import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 
 interface ToolFlowGraphProps {
-  nodesData: { id: string; count: number; is_high_risk: boolean }[];
+  nodesData: { id: string; count: number; is_high_risk: boolean; risk_reason?: string }[];
   edgesData: { from_tool: string; to_tool: string; weight: number; transition_rate: number }[];
 }
 
@@ -54,8 +54,13 @@ export default function ToolFlowGraph({ nodesData, edgesData }: ToolFlowGraphPro
       position: { x: 0, y: 0 },
       data: {
         label: (
-          <div className={`flex flex-col h-full justify-center w-full ${n.is_high_risk ? 'text-red-700' : 'text-slate-700'}`}>
-            <div className="font-mono text-[11px] truncate px-1 font-bold">{n.id}</div>
+          <div 
+            className={`flex flex-col h-full justify-center w-full ${n.is_high_risk ? 'text-red-700' : 'text-slate-700'}`}
+            title={n.risk_reason || `${n.id} (${n.count}次调用)`}
+          >
+            <div className="font-mono text-[11px] truncate px-1 font-bold">
+              {n.id} {n.is_high_risk && "⚠"}
+            </div>
             <div className={`text-[9px] ${n.is_high_risk ? 'text-red-400' : 'text-slate-400'}`}>
               {n.count} calls
             </div>
@@ -65,11 +70,11 @@ export default function ToolFlowGraph({ nodesData, edgesData }: ToolFlowGraphPro
       style: {
         width: nodeWidth,
         height: nodeHeight,
-        background: n.is_high_risk ? '#fef2f2' : '#ffffff',
-        border: `1px solid ${n.is_high_risk ? '#fca5a5' : '#e2e8f0'}`,
-        borderRadius: '6px',
+        background: n.is_high_risk ? '#fff1f2' : '#ffffff',
+        border: `1px solid ${n.is_high_risk ? '#fda4af' : '#e2e8f0'}`,
+        borderRadius: '8px',
         padding: 0,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        boxShadow: n.is_high_risk ? '0 4px 6px -1px rgba(225, 29, 72, 0.1), 0 2px 4px -1px rgba(225, 29, 72, 0.06)' : '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
         textAlign: 'center' as const,
       }
     }));
@@ -84,12 +89,12 @@ export default function ToolFlowGraph({ nodesData, edgesData }: ToolFlowGraphPro
       type: 'smoothstep',
       animated: e.weight > 50,
       labelStyle: { fill: '#64748b', fontSize: 10, fontWeight: 600 },
-      labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
+      labelBgStyle: { fill: '#f8fafc', fillOpacity: 0.9, rx: 4, ry: 4 },
       style: {
-        strokeWidth: Math.max(1, Math.min(4, e.weight / 10)),
-        stroke: '#94a3b8',
+        strokeWidth: Math.max(1.5, Math.min(5, e.weight / 10)),
+        stroke: '#cbd5e1',
       },
-      markerEnd: { type: 'arrowclosed' as any, color: '#94a3b8' },
+      markerEnd: { type: 'arrowclosed' as any, color: '#cbd5e1' },
     }));
   }, [edgesData]);
 
@@ -106,7 +111,8 @@ export default function ToolFlowGraph({ nodesData, edgesData }: ToolFlowGraphPro
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   return (
-    <div className="h-[600px] w-full border border-slate-200 rounded-lg bg-slate-50">
+    <div className="h-[600px] w-full border border-slate-200 rounded-xl bg-white relative overflow-hidden shadow-sm">
+      <style>{`.react-flow__handle { opacity: 0; }`}</style>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -116,8 +122,8 @@ export default function ToolFlowGraph({ nodesData, edgesData }: ToolFlowGraphPro
         attributionPosition="bottom-right"
         minZoom={0.2}
       >
-        <Background color="#cbd5e1" gap={16} />
-        <Controls />
+        <Background color="#f1f5f9" gap={20} size={2} />
+        <Controls showInteractive={false} className="bg-white border-slate-200 shadow-sm rounded-lg" />
       </ReactFlow>
     </div>
   );

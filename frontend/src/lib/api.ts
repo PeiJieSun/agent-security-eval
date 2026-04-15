@@ -225,13 +225,13 @@ export const api = {
 
   // M2-3: Tool Call Graph
   getToolCallGraph: () => req<{
-    nodes: { id: string; count: number; is_high_risk: boolean }[];
+    nodes: { id: string; count: number; is_high_risk: boolean; risk_reason?: string }[];
     edges: { from_tool: string; to_tool: string; weight: number; transition_rate: number }[];
     top_paths: string[][];
     risk_coverage: number;
     total_trajectories: number;
     unique_tools: number;
-    high_risk_tools_found: string[];
+    high_risk_tools_found: { name: string; reason: string }[];
     summary: string;
   }>("/tool-call-graph"),
 

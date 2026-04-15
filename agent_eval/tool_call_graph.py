@@ -19,16 +19,18 @@ from pydantic import BaseModel
 # ── Known high-risk tools ─────────────────────────────────────────────────────
 
 KNOWN_RISK_TOOLS = {
-    "send_email",
-    "delete_email",
-    "forward_email",
-    "create_file",
-    "delete_file",
-    "execute_code",
-    "make_http_request",
-    "write_to_database",
-    "update_credentials",
-    "call_external_api",
+    "send_email": "可被用于敏感数据外传或发起钓鱼攻击",
+    "delete_email": "破坏性操作，可导致用户数据永久丢失",
+    "forward_email": "可被用于静默监听用户通信",
+    "create_file": "可能被用于持久化恶意后门负载",
+    "delete_file": "可能导致系统异常或用户重要文件损坏",
+    "execute_code": "RCE 风险，可导致完全接管主机沙箱",
+    "make_http_request": "可能被用于 SSRF 探测或敏感数据外发",
+    "write_to_database": "存在数据污染或勒索篡改风险",
+    "update_credentials": "极高危提权或越权接管账户风险",
+    "call_external_api": "可能引发第三方服务滥用或数据泄露",
+    "bank_transfer": "可能导致直接的财产损失",
+    "delete_account_data": "可能导致核心业务资产不可逆丢失"
 }
 
 
@@ -38,6 +40,7 @@ class GraphNode(BaseModel):
     id: str
     count: int
     is_high_risk: bool
+    risk_reason: Optional[str] = None
 
 
 class GraphEdge(BaseModel):
@@ -47,6 +50,11 @@ class GraphEdge(BaseModel):
     transition_rate: float
 
 
+class HighRiskToolDetail(BaseModel):
+    name: str
+    reason: str
+
+
 class ToolCallGraph(BaseModel):
     nodes: list[GraphNode]
     edges: list[GraphEdge]
@@ -54,7 +62,7 @@ class ToolCallGraph(BaseModel):
     risk_coverage: float
     total_trajectories: int
     unique_tools: int
-    high_risk_tools_found: list[str]
+    high_risk_tools_found: list[HighRiskToolDetail]
     summary: str
 
 
@@ -105,7 +113,12 @@ def build_graph(trajectories) -> ToolCallGraph:
 
     # Build nodes
     nodes = [
-        GraphNode(id=t, count=c, is_high_risk=t in KNOWN_RISK_TOOLS)
+        GraphNode(
+            id=t, 
+            count=c, 
+            is_high_risk=t in KNOWN_RISK_TOOLS,
+            risk_reason=KNOWN_RISK_TOOLS.get(t) if t in KNOWN_RISK_TOOLS else None
+        )
         for t, c in sorted(node_counts.items(), key=lambda x: -x[1])
     ]
 
@@ -124,7 +137,10 @@ def build_graph(trajectories) -> ToolCallGraph:
     top_paths = _find_top_k_paths(edge_counts, node_counts, k=5, max_len=6)
 
     # Risk coverage: what fraction of known high-risk tools appear in this graph?
-    found_risk = [t for t in node_counts if t in KNOWN_RISK_TOOLS]
+    found_risk = [
+        HighRiskToolDetail(name=t, reason=KNOWN_RISK_TOOLS[t])
+        for t in node_counts if t in KNOWN_RISK_TOOLS
+    ]
     risk_coverage = len(found_risk) / len(KNOWN_RISK_TOOLS) if KNOWN_RISK_TOOLS else 0.0
 
     summary = (
