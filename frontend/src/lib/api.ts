@@ -344,6 +344,22 @@ export const api = {
     all_verified: boolean;
   }>("/formal/verify"),
 
+  // Trajectory Import
+  listAdapters: () => req<{
+    adapter_id: string; name: string; description: string;
+    supported_formats: string[]; example_snippet: string;
+  }[]>("/adapters"),
+  previewImport: (adapter_id: string, raw: string, task_id?: string) =>
+    req<{ trajectories: any[]; warnings: string[]; stats: Record<string, any> }>(
+      "/import-trajectory/preview",
+      { method: "POST", body: JSON.stringify({ adapter_id, raw, task_id }) },
+    ),
+  importTrajectory: (adapter_id: string, raw: string, task_id?: string) =>
+    req<{ imported: number; run_ids: string[]; warnings: string[]; stats: Record<string, any> }>(
+      "/import-trajectory",
+      { method: "POST", body: JSON.stringify({ adapter_id, raw, task_id }) },
+    ),
+
   // Backend settings persistence
   getSettings: () => req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>("/settings"),
   updateSettings: (body: { api_key?: string; base_url?: string; model?: string }) =>

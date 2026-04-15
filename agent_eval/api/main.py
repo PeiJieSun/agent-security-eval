@@ -29,6 +29,8 @@ from agent_eval.api.routers import taint as taint_router
 from agent_eval.api.routers import source_audit as audit_router
 from agent_eval.api.routers import deep_analysis as deep_router
 from agent_eval.api.routers import formal as formal_router
+from agent_eval.api.routers import import_trajectory as import_router
+from agent_eval.api.routers import mcp_proxy as mcp_proxy_router
 from agent_eval.storage.sqlite_store import SqliteStore
 
 app = FastAPI(
@@ -68,6 +70,8 @@ app.include_router(audit_router.router)
 app.include_router(taint_router.router)
 app.include_router(deep_router.router)
 app.include_router(formal_router.router)
+app.include_router(import_router.router)
+app.include_router(mcp_proxy_router.router)
 
 
 @app.get("/health")

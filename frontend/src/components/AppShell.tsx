@@ -55,6 +55,13 @@ const NAV: NavSection[] = [
     ],
   },
   {
+    heading: "真实 Agent 接入",
+    items: [
+      { label: "轨迹导入", path: "/import", desc: "导入 Claude Code / Codex / MCP 等外部 Agent 日志" },
+      { label: "MCP 安全代理", path: "/mcp-proxy", desc: "透明拦截 Agent 与 MCP Server 之间的通信" },
+    ],
+  },
+  {
     heading: "工具 & 扩展",
     items: [
       { label: "长期趋势",    path: "/behavior/trend",    desc: "跨版本三维指标漂移与 KL 散度" },

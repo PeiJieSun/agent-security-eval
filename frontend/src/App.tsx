@@ -34,6 +34,8 @@ import SourceAuditPage from "./pages/SourceAuditPage";
 import TaintAnalysisPage from "./pages/TaintAnalysisPage";
 import DeepAnalysisPage from "./pages/DeepAnalysisPage";
 import FormalVerificationPage from "./pages/FormalVerificationPage";
+import TrajectoryImportPage from "./pages/TrajectoryImportPage";
+import MCPProxyPage from "./pages/MCPProxyPage";
 
 export default function App() {
   return (
@@ -106,6 +108,10 @@ export default function App() {
           <Route path="/formal-verification" element={<FormalVerificationPage />} />
           {/* Defense Gateway */}
           <Route path="/defense" element={<DefenseGatewayPage />} />
+          {/* Trajectory Import */}
+          <Route path="/import" element={<TrajectoryImportPage />} />
+          {/* MCP Proxy */}
+          <Route path="/mcp-proxy" element={<MCPProxyPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
