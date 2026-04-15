@@ -60,10 +60,10 @@ const SOURCE_LABEL: Record<string, string> = {
 // Severity: filled chip with background
 function SeverityChip({ severity }: { severity: string }) {
   const styles: Record<string, string> = {
-    critical: "bg-red-950 text-red-300 border border-red-800",
-    high:     "bg-amber-950 text-amber-300 border border-amber-800",
-    medium:   "bg-yellow-950 text-yellow-300 border border-yellow-800",
-    low:      "bg-slate-800 text-slate-400 border border-slate-700",
+    critical: "bg-red-50 text-red-700 border border-red-200",
+    high:     "bg-amber-50 text-amber-700 border border-amber-200",
+    medium:   "bg-yellow-50 text-yellow-700 border border-yellow-200",
+    low:      "bg-slate-50 text-slate-600 border border-slate-200",
   };
   return (
     <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded ${styles[severity] ?? styles.low}`}>
@@ -75,10 +75,10 @@ function SeverityChip({ severity }: { severity: string }) {
 // Status badge: filled for pass/fail, ghost for not_run
 function StatusBadge({ status }: { status: Dimension["status"] }) {
   if (status === "pass")
-    return <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded bg-emerald-900 text-emerald-300 border border-emerald-700">PASS</span>;
+    return <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">PASS</span>;
   if (status === "fail")
-    return <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-700">FAIL</span>;
-  return <span className="inline-block text-[11px] px-2.5 py-0.5 rounded border border-white/10 text-slate-600">未运行</span>;
+    return <span className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">FAIL</span>;
+  return <span className="inline-block text-[11px] px-2.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-500">未运行</span>;
 }
 
 function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => void }) {
@@ -90,11 +90,11 @@ function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => voi
   const dimmed = dim.status === "not_run";
 
   return (
-    <tr className={`border-b border-white/[0.06] transition-colors ${dimmed ? "opacity-50" : "hover:bg-white/[0.03]"}`}>
+    <tr className={`border-b border-slate-200 transition-colors ${dimmed ? "opacity-50" : "bg-white hover:bg-slate-50"}`}>
       {/* Dimension name + description */}
       <td className="py-3.5 px-4" style={{ width: "38%" }}>
-        <div className="text-[13px] font-medium text-slate-100 leading-snug">{dim.name}</div>
-        <div className="text-[12px] text-slate-400 mt-1 leading-relaxed">{dim.description}</div>
+        <div className="text-[13px] font-medium text-slate-900 leading-snug">{dim.name}</div>
+        <div className="text-[12px] text-slate-500 mt-1 leading-relaxed">{dim.description}</div>
       </td>
 
       {/* Severity */}
@@ -104,15 +104,15 @@ function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => voi
 
       {/* Threshold */}
       <td className="py-3.5 px-3">
-        <span className="text-[12px] font-mono text-slate-400">{dim.threshold}</span>
+        <span className="text-[12px] font-mono text-slate-500">{dim.threshold}</span>
       </td>
 
       {/* Score — visual anchor, largest and brightest */}
       <td className="py-3.5 px-3 text-right whitespace-nowrap">
         <span className={`text-[18px] font-bold tabular-nums leading-none ${
-          !hasScore ? "text-slate-700" :
-          dim.status === "pass" ? "text-emerald-400" :
-          dim.status === "fail" ? "text-red-400" : "text-slate-300"
+          !hasScore ? "text-slate-400" :
+          dim.status === "pass" ? "text-emerald-600" :
+          dim.status === "fail" ? "text-red-600" : "text-slate-600"
         }`}>{scoreStr}</span>
       </td>
 
@@ -124,15 +124,15 @@ function DimRow({ dim, onJump }: { dim: Dimension; onJump: (path: string) => voi
       {/* Source / action */}
       <td className="py-3.5 px-4">
         {dim.status !== "not_run" && sourceId ? (
-          <div className="text-[11px] text-slate-500 leading-relaxed">
-            <span className="text-slate-400">{sourceLabel}</span>
+          <div className="text-[11px] text-slate-600 leading-relaxed">
+            <span className="text-slate-500">{sourceLabel}</span>
             <br />
-            <span className="font-mono text-slate-600">{sourceId}</span>
+            <span className="font-mono text-slate-400">{sourceId}</span>
           </div>
         ) : jumpPath ? (
           <button
             onClick={() => onJump(jumpPath)}
-            className="text-[12px] text-sky-400 hover:text-sky-200 font-medium whitespace-nowrap transition-colors"
+            className="text-[12px] text-sky-600 hover:text-sky-800 font-medium whitespace-nowrap transition-colors"
           >
             去运行 →
           </button>
@@ -158,16 +158,16 @@ function TierSection({ tier, dims, onJump, onRunAll }: {
       {/* Tier header */}
       <div className="flex items-end justify-between mb-3 px-1">
         <div>
-          <h2 className="text-[13px] font-semibold text-slate-200 tracking-wide">{meta.label}</h2>
+          <h2 className="text-[13px] font-semibold text-slate-800 tracking-wide">{meta.label}</h2>
           <p className="text-[11px] text-slate-500 mt-0.5">{meta.sub}</p>
         </div>
         <div className="flex items-center gap-3 text-[12px]">
-          {passCount > 0 && <span className="text-emerald-400">{passCount} 通过</span>}
-          {failCount > 0 && <span className="text-red-400">{failCount} 失败</span>}
+          {passCount > 0 && <span className="text-emerald-600 font-medium">{passCount} 通过</span>}
+          {failCount > 0 && <span className="text-red-600 font-medium">{failCount} 失败</span>}
           {notRunCount > 0 && (
             <button
               onClick={() => onRunAll(meta.jump)}
-              className="text-sky-400 hover:text-sky-200 transition-colors"
+              className="text-sky-600 hover:text-sky-800 font-medium transition-colors"
             >
               {notRunCount} 未运行 →
             </button>
@@ -176,10 +176,10 @@ function TierSection({ tier, dims, onJump, onRunAll }: {
       </div>
 
       {/* Table */}
-      <div className="border border-white/[0.08] rounded-lg overflow-hidden">
+      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
         <table className="w-full">
           <thead>
-            <tr className="bg-white/[0.03] border-b border-white/[0.08]">
+            <tr className="bg-slate-50 border-b border-slate-200">
               <th className="py-2.5 px-4 text-left text-[11px] font-medium text-slate-500 uppercase tracking-wider">维度</th>
               <th className="py-2.5 px-3 text-left text-[11px] font-medium text-slate-500 uppercase tracking-wider">严重性</th>
               <th className="py-2.5 px-3 text-left text-[11px] font-medium text-slate-500 uppercase tracking-wider">通过阈值</th>
@@ -237,13 +237,13 @@ export default function AgentReportPage() {
   }
 
   const overallColor = !report ? "" :
-    report.overall === "pass" ? "border-emerald-700 bg-emerald-950/40" :
-    report.overall === "fail" ? "border-red-800 bg-red-950/30" :
-    "border-white/10";
+    report.overall === "pass" ? "border-emerald-200 bg-emerald-50" :
+    report.overall === "fail" ? "border-red-200 bg-red-50" :
+    "border-slate-200 bg-white";
   const overallTextColor = !report ? "" :
-    report.overall === "pass" ? "text-emerald-300" :
-    report.overall === "fail" ? "text-red-300" :
-    "text-slate-400";
+    report.overall === "pass" ? "text-emerald-700" :
+    report.overall === "fail" ? "text-red-700" :
+    "text-slate-500";
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -254,15 +254,15 @@ export default function AgentReportPage() {
 
       {/* Top bar: model selector + export */}
       <div className="flex items-center gap-3 mb-6">
-        <label className="text-[12px] text-slate-500 shrink-0">模型</label>
+        <label className="text-[12px] font-medium text-slate-700 shrink-0">模型</label>
         {models.length > 0 ? (
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="bg-white/[0.04] border border-white/10 rounded px-3 py-1.5 text-[13px] text-slate-200 focus:outline-none focus:border-white/20"
+            className="bg-white border border-slate-300 shadow-sm rounded px-3 py-1.5 text-[13px] text-slate-800 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
           >
             {models.map((m) => (
-              <option key={m} value={m} className="bg-[#111]">{m}</option>
+              <option key={m} value={m} className="bg-white text-slate-800">{m}</option>
             ))}
           </select>
         ) : (
@@ -273,7 +273,7 @@ export default function AgentReportPage() {
             href={`/agent-report/export?model=${encodeURIComponent(selectedModel)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto text-[12px] border border-white/10 rounded px-3 py-1.5 text-slate-400 hover:text-slate-200 hover:border-white/20 transition-colors"
+            className="ml-auto text-[12px] font-medium border border-slate-300 bg-white shadow-sm rounded px-3 py-1.5 text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors"
           >
             导出 HTML ↗
           </a>
@@ -281,16 +281,16 @@ export default function AgentReportPage() {
       </div>
 
       {loading && (
-        <div className="text-[14px] text-slate-400 mt-12 text-center">加载中…</div>
+        <div className="text-[14px] text-slate-500 mt-12 text-center">加载中…</div>
       )}
       {error && (
-        <div className="text-[13px] text-red-400 mt-4 border border-red-900 rounded px-4 py-3">{error}</div>
+        <div className="text-[13px] text-red-600 mt-4 border border-red-200 bg-red-50 rounded px-4 py-3">{error}</div>
       )}
       {!loading && !error && !selectedModel && (
         <div className="mt-16 text-center space-y-3">
           <p className="text-[14px] text-slate-500">还没有评测数据</p>
           <button onClick={() => navigate("/batch-eval")}
-            className="text-[13px] text-sky-400 hover:text-sky-200 transition-colors">
+            className="text-[13px] font-medium text-sky-600 hover:text-sky-800 transition-colors">
             前往批量评测 →
           </button>
         </div>
@@ -299,37 +299,37 @@ export default function AgentReportPage() {
       {!loading && report && (
         <>
           {/* Summary strip */}
-          <div className={`flex items-center gap-6 border rounded-lg px-5 py-4 mb-8 ${overallColor}`}>
+          <div className={`flex items-center gap-6 border rounded-lg px-5 py-4 mb-8 shadow-sm ${overallColor}`}>
             {/* Overall verdict */}
             <div className="shrink-0">
-              <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">综合结论</div>
+              <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider mb-1">综合结论</div>
               <div className={`text-[28px] font-black leading-none ${overallTextColor}`}>
                 {report.overall === "pass" ? "PASS" : report.overall === "fail" ? "FAIL" : "—"}
               </div>
             </div>
-            <div className="w-px h-10 bg-white/[0.08] shrink-0" />
+            <div className="w-px h-10 bg-slate-200 shrink-0" />
             {/* Stats */}
             <div className="flex gap-5 text-center">
               <div>
-                <div className="text-[22px] font-bold text-emerald-400 leading-none">{report.passed}</div>
-                <div className="text-[11px] text-slate-500 mt-1">通过</div>
+                <div className="text-[22px] font-bold text-emerald-600 leading-none">{report.passed}</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-1">通过</div>
               </div>
               <div>
-                <div className="text-[22px] font-bold text-red-400 leading-none">
+                <div className="text-[22px] font-bold text-red-600 leading-none">
                   {report.scored - report.passed}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">失败</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-1">失败</div>
               </div>
               <div>
-                <div className="text-[22px] font-bold text-slate-600 leading-none">{report.not_run}</div>
-                <div className="text-[11px] text-slate-500 mt-1">未运行</div>
+                <div className="text-[22px] font-bold text-slate-400 leading-none">{report.not_run}</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-1">未运行</div>
               </div>
             </div>
-            <div className="w-px h-10 bg-white/[0.08] shrink-0" />
+            <div className="w-px h-10 bg-slate-200 shrink-0" />
             {/* Batch ref */}
             <div className="min-w-0">
-              <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">T1 数据批次</div>
-              <div className="text-[13px] font-mono text-slate-400 truncate">
+              <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wider mb-1">T1 数据批次</div>
+              <div className="text-[13px] font-mono text-slate-500 truncate">
                 {report.source_batch ?? "—"}
               </div>
             </div>
@@ -342,7 +342,7 @@ export default function AgentReportPage() {
                   return (
                     <button key={tier}
                       onClick={() => navigate(TIER_META[tier].jump)}
-                      className="text-[11px] text-sky-400 hover:text-sky-200 border border-sky-900/60 rounded px-3 py-1 text-left transition-colors"
+                      className="text-[11px] font-medium text-sky-600 hover:text-sky-800 bg-white border border-sky-200 rounded px-3 py-1 text-left transition-colors shadow-sm"
                     >
                       运行 {tier}类威胁 · {nr} 项未完成
                     </button>
