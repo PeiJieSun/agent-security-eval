@@ -25,10 +25,9 @@ interface AttackScenario {
 }
 
 interface ToolHook {
-  tool_id: string;
   name: string;
   description: string;
-  params: Record<string, string>;
+  parameters: Record<string, string>;
 }
 
 interface ComplianceRule {
@@ -37,7 +36,7 @@ interface ComplianceRule {
   section: string;
   description: string;
   severity: string;
-  dimension: string;
+  dimension_mapping: string[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -255,16 +254,16 @@ function ToolsTab({ tools }: { tools: ToolHook[] }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {tools.map((t) => (
         <div
-          key={t.tool_id}
+          key={t.name}
           className="rounded-lg border border-slate-100 p-4"
         >
           <div className="text-[13px] font-medium text-slate-900 mb-1 font-mono">
             {t.name}
           </div>
           <p className="text-[12px] text-slate-500 mb-2">{t.description}</p>
-          {Object.keys(t.params).length > 0 && (
+          {Object.keys(t.parameters ?? {}).length > 0 && (
             <div className="space-y-1">
-              {Object.entries(t.params).map(([k, v]) => (
+              {Object.entries(t.parameters).map(([k, v]) => (
                 <div key={k} className="flex gap-2 text-[11px]">
                   <code className="text-blue-600 bg-blue-50 px-1 rounded">{k}</code>
                   <span className="text-slate-400">{v}</span>
@@ -304,9 +303,13 @@ function ComplianceTab({ rules }: { rules: ComplianceRule[] }) {
                 <SeverityBadge severity={r.severity} />
               </td>
               <td className="py-2 text-slate-500">
-                <span className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded">
-                  {r.dimension}
-                </span>
+                <div className="flex flex-wrap gap-1">
+                  {(r.dimension_mapping ?? []).map((d) => (
+                    <span key={d} className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded">
+                      {d}
+                    </span>
+                  ))}
+                </div>
               </td>
             </tr>
           ))}
