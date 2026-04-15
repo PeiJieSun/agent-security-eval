@@ -101,3 +101,40 @@ def simulate_call(req: SimulateRequest) -> dict:
         "sanitized_response": sanitized,
         "was_modified": sanitized != req.response_text,
     }
+
+
+class FullDefenseCheckRequest(BaseModel):
+    tool_name: str
+    tool_response: str = ""
+    reasoning: str = ""
+    previous_observations: list[str] = []
+    user_instruction: str = ""
+    context: dict = {}
+    session_asr: float = 0.0
+    session_actions: int = 0
+
+
+@router.post("/defense/full-check")
+def full_defense_check(req: FullDefenseCheckRequest) -> dict:
+    gw = get_gateway()
+    return gw.full_defense_check(
+        tool_name=req.tool_name,
+        tool_response=req.tool_response,
+        reasoning=req.reasoning,
+        previous_observations=req.previous_observations,
+        user_instruction=req.user_instruction,
+        context=req.context,
+        session_asr=req.session_asr,
+        session_actions=req.session_actions,
+    )
+
+
+class AuditPolicyRequest(BaseModel):
+    vulns: list[dict]
+
+
+@router.post("/defense/generate-from-audit")
+def generate_from_audit(req: AuditPolicyRequest) -> dict:
+    gw = get_gateway()
+    new_policies = gw.generate_policies_from_audit(req.vulns)
+    return {"generated": len(new_policies), "policies": [p.model_dump() for p in new_policies]}

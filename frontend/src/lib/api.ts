@@ -309,6 +309,41 @@ export const api = {
       }[];
     }>(`/agent-report?model=${encodeURIComponent(model)}`),
 
+  // Deep Analysis (three-layer integration)
+  getDeepAnalysis: (model: string, framework: string = "") =>
+    req<{
+      model: string;
+      framework: string;
+      layers_active: number;
+      layer1_behavioral: Record<string, unknown>;
+      layer2_source_audit: Record<string, unknown>;
+      layer3_taint_analysis: Record<string, unknown>;
+      cross_layer_links: { type: string; title: string; evidence: string; severity: string }[];
+      has_full_chain: boolean;
+    }>(`/deep-analysis?model=${encodeURIComponent(model)}${framework ? `&framework=${encodeURIComponent(framework)}` : ""}`),
+  listAuditableFrameworks: () =>
+    req<{ id: string; name: string; pattern_count: number }[]>("/deep-analysis/frameworks"),
+
+  // Formal Verification
+  getStateMachine: () => req<Record<string, unknown>>("/formal/state-machine"),
+  verifyFormal: () => req<{
+    state_count: number;
+    transition_count: number;
+    property_count: number;
+    results: {
+      property_id: string;
+      property_name: string;
+      verified: boolean;
+      counterexample: string[];
+      counterexample_tools: string[];
+      reachable_sinks: number;
+      total_sinks: number;
+      attack_paths_found: number;
+      analysis_summary: string;
+    }[];
+    all_verified: boolean;
+  }>("/formal/verify"),
+
   // Backend settings persistence
   getSettings: () => req<{ api_key_masked: string; api_key_set: boolean; base_url: string; model: string }>("/settings"),
   updateSettings: (body: { api_key?: string; base_url?: string; model?: string }) =>

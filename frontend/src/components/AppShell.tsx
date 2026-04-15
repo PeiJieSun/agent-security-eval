@@ -42,8 +42,10 @@ const NAV: NavSection[] = [
   {
     heading: "深度分析",
     items: [
+      { label: "三层联动分析", path: "/deep-analysis", desc: "L1 行为 × L2 源码 × L3 污点 — 完整证据链" },
       { label: "源码审计", path: "/source-audit", desc: "AST 静态分析 Agent 框架特有漏洞" },
       { label: "污点追踪", path: "/taint-analysis", desc: "Prompt Flow 中不可信数据传播链路追踪" },
+      { label: "形式化验证", path: "/formal-verification", desc: "Agent 行为状态机安全属性验证" },
     ],
   },
   {

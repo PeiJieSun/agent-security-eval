@@ -731,14 +731,13 @@ def _run_eval_background(
 # ── M2-3: Tool Call Graph ─────────────────────────────────────────────────
 
 @router.get("/tool-call-graph")
-def get_tool_call_graph() -> dict:
+def get_tool_call_graph(include_taint: bool = False) -> dict:
     """
     Build and return a directed weighted Tool Call Graph from all stored trajectories.
     Useful for identifying high-risk tool transition paths across evaluated agents.
     """
-    from agent_eval.tool_call_graph import build_graph
+    from agent_eval.tool_call_graph import build_graph, annotate_graph_with_taint
 
-    # Load all trajectories from DB
     trajectories = []
     with _store._conn() as con:
         rows = con.execute(
@@ -752,6 +751,12 @@ def get_tool_call_graph() -> dict:
             continue
 
     graph = build_graph(trajectories)
+
+    if include_taint:
+        from agent_eval.taint_analysis import analyze_trajectories
+        taint_traces = analyze_trajectories(trajectories)
+        graph = annotate_graph_with_taint(graph, taint_traces)
+
     return graph.model_dump()
 
 

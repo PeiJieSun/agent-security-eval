@@ -18,6 +18,9 @@ interface GraphEdge {
   to_tool: string;
   weight: number;
   transition_rate: number;
+  taint_count?: number;
+  has_taint_propagation?: boolean;
+  example_taint_summary?: string;
 }
 
 interface HighRiskTool {
@@ -41,16 +44,18 @@ export default function ToolCallGraphPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"visual" | "edges" | "paths" | "nodes">("visual");
+  const [includeTaint, setIncludeTaint] = useState(false);
 
   const load = () => {
     setLoading(true);
-    api.getToolCallGraph()
+    const url = `/api/v1/agent-eval/tool-call-graph${includeTaint ? "?include_taint=true" : ""}`;
+    fetch(url).then(r => r.json())
       .then(setGraph)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [includeTaint]);
 
   return (
     <div className="px-8 py-7 max-w-5xl mx-auto space-y-6">
@@ -60,11 +65,18 @@ export default function ToolCallGraphPage() {
           <h1 className="text-[15px] font-semibold text-slate-900">工具调用图</h1>
           <p className="text-[12px] text-slate-400 mt-0.5">M2-3 · 从轨迹库提取工具转移模式，发现高风险攻击路径</p>
         </div>
-        <button
-          onClick={load}
-          className="text-slate-400 hover:text-slate-600 text-sm w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100"
-          title="重新计算"
-        >↻</button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" checked={includeTaint} onChange={(e) => { setIncludeTaint(e.target.checked); }}
+              className="rounded border-slate-300" />
+            叠加污点标注
+          </label>
+          <button
+            onClick={load}
+            className="text-slate-400 hover:text-slate-600 text-sm w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100"
+            title="重新计算"
+          >↻</button>
+        </div>
       </div>
 
       {/* Theory */}

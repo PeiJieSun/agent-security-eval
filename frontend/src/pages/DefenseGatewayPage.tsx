@@ -37,6 +37,9 @@ export default function DefenseGatewayPage() {
   const [simResp, setSimResp] = useState("");
   const [simResult, setSimResult] = useState<SimResult | null>(null);
   const [genLoading, setGenLoading] = useState(false);
+  const [fullCheck, setFullCheck] = useState({ tool_name: "", tool_response: "", reasoning: "", user_instruction: "" });
+  const [fullResult, setFullResult] = useState<Record<string, any> | null>(null);
+  const [fullLoading, setFullLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     const [s, p, l] = await Promise.all([
@@ -170,6 +173,81 @@ export default function DefenseGatewayPage() {
                 <p className="text-blue-600"><span className="font-medium">净化后：</span>{simResult.sanitized_response}</p>
               </>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* ── Five-Layer Full Defense Check ── */}
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">五层纵深防御检查</h2>
+        <p className="text-[11px] text-slate-400 mb-3">L1 净化 → L2 CoT 审计 → L3 权限 DAG → L4 意图验证 → L5 熔断</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <input value={fullCheck.tool_name} onChange={e => setFullCheck(p => ({ ...p, tool_name: e.target.value }))}
+            placeholder="tool_name" className="border rounded px-2 py-1.5 text-xs text-slate-700" />
+          <input value={fullCheck.user_instruction} onChange={e => setFullCheck(p => ({ ...p, user_instruction: e.target.value }))}
+            placeholder="用户原始指令" className="border rounded px-2 py-1.5 text-xs text-slate-700" />
+          <textarea value={fullCheck.tool_response} onChange={e => setFullCheck(p => ({ ...p, tool_response: e.target.value }))}
+            placeholder="模拟工具返回文本（可包含 IPI 载荷）" rows={2}
+            className="border rounded px-2 py-1.5 text-xs text-slate-700 font-mono resize-y" />
+          <textarea value={fullCheck.reasoning} onChange={e => setFullCheck(p => ({ ...p, reasoning: e.target.value }))}
+            placeholder="模拟 CoT 推理文本" rows={2}
+            className="border rounded px-2 py-1.5 text-xs text-slate-700 font-mono resize-y" />
+        </div>
+        <button onClick={async () => {
+          setFullLoading(true);
+          try {
+            const res = await fetch(`${API}/full-check`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tool_name: fullCheck.tool_name,
+                tool_response: fullCheck.tool_response,
+                reasoning: fullCheck.reasoning,
+                user_instruction: fullCheck.user_instruction,
+                previous_observations: fullCheck.tool_response ? [fullCheck.tool_response] : [],
+                context: {},
+              }),
+            });
+            setFullResult(await res.json());
+            refresh();
+          } finally { setFullLoading(false); }
+        }} disabled={!fullCheck.tool_name || fullLoading}
+          className="text-xs px-4 py-1.5 rounded bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40">
+          {fullLoading ? "检查中…" : "运行五层检查"}
+        </button>
+        {fullResult && (
+          <div className="mt-3 space-y-2">
+            <div className={`rounded-lg border p-3 text-xs ${fullResult.passed ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+              <span className={`font-semibold ${fullResult.passed ? "text-emerald-700" : "text-red-700"}`}>
+                {fullResult.passed ? "全部通过" : "防御触发拦截"}
+              </span>
+            </div>
+            {Object.entries(fullResult.layers || {}).map(([layer, data]: [string, any]) => {
+              const layerNames: Record<string, string> = {
+                l1_sanitize: "L1 净化", l2_cot_audit: "L2 CoT 审计",
+                l3_permission: "L3 权限 DAG", l4_oracle: "L4 意图验证", l5_kill_switch: "L5 熔断",
+              };
+              const ok = layer === "l1_sanitize" ? !data.sanitized
+                : layer === "l2_cot_audit" ? data.clean
+                : layer === "l3_permission" ? data.allowed
+                : layer === "l4_oracle" ? data.aligned
+                : layer === "l5_kill_switch" ? !data.halt : true;
+              return (
+                <div key={layer} className={`rounded border p-2.5 text-xs flex items-start gap-2 ${ok ? "border-slate-200" : "border-red-200 bg-red-50/50"}`}>
+                  <span className={`shrink-0 w-2 h-2 rounded-full mt-0.5 ${ok ? "bg-emerald-500" : "bg-red-500"}`} />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-slate-800">{layerNames[layer] || layer}</span>
+                    {data.flags?.length > 0 && (
+                      <ul className="mt-1 text-red-700 space-y-0.5">
+                        {data.flags.map((f: string, i: number) => <li key={i}>• {f}</li>)}
+                      </ul>
+                    )}
+                    {data.reason && !ok && <p className="text-red-600 mt-0.5">{data.reason}</p>}
+                    {data.actions?.length > 0 && <p className="text-blue-600 mt-0.5">动作: {data.actions.join(", ")}</p>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

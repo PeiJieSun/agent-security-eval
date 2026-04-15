@@ -48,6 +48,9 @@ class GraphEdge(BaseModel):
     to_tool: str
     weight: int
     transition_rate: float
+    taint_count: int = 0
+    has_taint_propagation: bool = False
+    example_taint_summary: str = ""
 
 
 class HighRiskToolDetail(BaseModel):
@@ -203,3 +206,56 @@ def _find_top_k_paths(
             break
 
     return paths
+
+
+def annotate_graph_with_taint(graph: ToolCallGraph, taint_traces: list) -> ToolCallGraph:
+    """
+    Overlay taint analysis results onto the tool call graph.
+
+    For each taint link (source_tool → sink_tool), find matching edges in the graph
+    and annotate them with taint counts and propagation flags.
+    """
+    edge_key = lambda e: (e.from_tool, e.to_tool)
+    edge_map: dict[tuple[str, str], int] = {}
+    for i, e in enumerate(graph.edges):
+        edge_map[edge_key(e)] = i
+
+    for trace in taint_traces:
+        links = getattr(trace, 'links', [])
+        if not links and isinstance(trace, dict):
+            links = trace.get('links', [])
+
+        for link in links:
+            if hasattr(link, 'source'):
+                src_tool = link.source.tool_name
+                sink_tool = link.sink.tool_name
+                is_attack = link.attack_confirmed
+                summary = link.summary
+            else:
+                src_tool = link.get('source', {}).get('tool_name', '')
+                sink_tool = link.get('sink', {}).get('tool_name', '')
+                is_attack = link.get('attack_confirmed', False)
+                summary = link.get('summary', '')
+
+            key = (src_tool, sink_tool)
+            if key in edge_map:
+                idx = edge_map[key]
+                graph.edges[idx].taint_count += 1
+                graph.edges[idx].has_taint_propagation = True
+                if is_attack and not graph.edges[idx].example_taint_summary:
+                    graph.edges[idx].example_taint_summary = summary[:200]
+
+            if hasattr(link, 'propagations'):
+                props = link.propagations
+            else:
+                props = link.get('propagations', [])
+
+            if props:
+                prev_tool = src_tool
+                for prop in props:
+                    pass
+
+    tainted_edge_count = sum(1 for e in graph.edges if e.has_taint_propagation)
+    graph.summary += f" | 污点标注：{tainted_edge_count}/{len(graph.edges)} 条边有污点传播"
+
+    return graph

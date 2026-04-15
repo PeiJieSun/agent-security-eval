@@ -32,6 +32,8 @@ import DeltaAuditPage from "./pages/DeltaAuditPage";
 import CompliancePage from "./pages/CompliancePage";
 import SourceAuditPage from "./pages/SourceAuditPage";
 import TaintAnalysisPage from "./pages/TaintAnalysisPage";
+import DeepAnalysisPage from "./pages/DeepAnalysisPage";
+import FormalVerificationPage from "./pages/FormalVerificationPage";
 
 export default function App() {
   return (
@@ -98,6 +100,10 @@ export default function App() {
           <Route path="/source-audit" element={<SourceAuditPage />} />
           {/* Taint Analysis */}
           <Route path="/taint-analysis" element={<TaintAnalysisPage />} />
+          {/* Deep Analysis (three-layer integration) */}
+          <Route path="/deep-analysis" element={<DeepAnalysisPage />} />
+          {/* Formal Verification */}
+          <Route path="/formal-verification" element={<FormalVerificationPage />} />
           {/* Defense Gateway */}
           <Route path="/defense" element={<DefenseGatewayPage />} />
         </Route>

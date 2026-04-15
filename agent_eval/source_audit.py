@@ -137,6 +137,82 @@ CWE_CATALOG = {
 }
 
 
+FRAMEWORK_KNOWN_VULNS: dict[str, list[dict]] = {
+    "langchain": [
+        {
+            "cwe": "AGENT-CWE-001",
+            "pattern": "AgentExecutor._call builds prompt by concatenating tool observation directly",
+            "class_names": ["AgentExecutor"],
+            "method_names": ["_call", "_take_next_step", "_perform_agent_action"],
+            "indicator_vars": ["observation", "output", "tool_output"],
+            "severity": "critical",
+        },
+        {
+            "cwe": "AGENT-CWE-002",
+            "pattern": "ConversationBufferMemory shared across chains",
+            "class_names": ["ConversationChain", "LLMChain"],
+            "method_names": ["__init__"],
+            "indicator_vars": ["memory", "chat_memory"],
+            "severity": "high",
+        },
+        {
+            "cwe": "AGENT-CWE-004",
+            "pattern": "BaseChatModel stores system message as accessible attribute",
+            "class_names": ["BaseChatModel", "ChatOpenAI", "ChatAnthropic"],
+            "method_names": [],
+            "indicator_vars": ["system_message", "messages"],
+            "severity": "medium",
+        },
+    ],
+    "crewai": [
+        {
+            "cwe": "AGENT-CWE-001",
+            "pattern": "CrewAI Agent builds context by concatenating tool results into prompt",
+            "class_names": ["Agent", "CrewAgentExecutor"],
+            "method_names": ["execute_task", "_run"],
+            "indicator_vars": ["result", "output", "tool_output"],
+            "severity": "critical",
+        },
+        {
+            "cwe": "AGENT-CWE-003",
+            "pattern": "Agent tools list has no access control boundaries",
+            "class_names": ["Agent", "Crew"],
+            "method_names": ["__init__"],
+            "indicator_vars": ["tools"],
+            "severity": "high",
+        },
+    ],
+    "autogen": [
+        {
+            "cwe": "AGENT-CWE-001",
+            "pattern": "ConversableAgent appends tool response messages without sanitization",
+            "class_names": ["ConversableAgent", "AssistantAgent"],
+            "method_names": ["generate_reply", "_process_received_message"],
+            "indicator_vars": ["message", "content", "tool_response"],
+            "severity": "critical",
+        },
+        {
+            "cwe": "AGENT-CWE-003",
+            "pattern": "register_for_llm registers tools without permission model",
+            "class_names": ["ConversableAgent"],
+            "method_names": ["register_for_llm", "register_for_execution"],
+            "indicator_vars": [],
+            "severity": "high",
+        },
+    ],
+    "dify": [
+        {
+            "cwe": "AGENT-CWE-001",
+            "pattern": "Workflow node concatenates tool output into next prompt",
+            "class_names": ["ToolNode", "LLMNode"],
+            "method_names": ["_run", "run"],
+            "indicator_vars": ["outputs", "tool_output", "result"],
+            "severity": "critical",
+        },
+    ],
+}
+
+
 # ── AST Visitors for each CWE ───────────────────────────────────────────────
 
 class _BaseVisitor(ast.NodeVisitor):
@@ -423,6 +499,127 @@ class CWE005Visitor(_BaseVisitor):
         self.generic_visit(node)
 
 
+class FrameworkPatternVisitor(_BaseVisitor):
+    """Match known framework-specific vulnerability patterns."""
+
+    def __init__(self, file_path: str, source_lines: list[str], framework: str):
+        super().__init__(file_path, source_lines)
+        self.patterns = FRAMEWORK_KNOWN_VULNS.get(framework, [])
+
+    def visit_ClassDef(self, node: ast.ClassDef):
+        old = self._current_class
+        self._current_class = node.name
+        self.generic_visit(node)
+        self._current_class = old
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        old = self._current_func
+        self._current_func = node.name
+        for pat in self.patterns:
+            class_match = not pat["class_names"] or self._current_class in pat["class_names"]
+            method_match = not pat["method_names"] or node.name in pat["method_names"]
+            if class_match and method_match:
+                body_names = self._collect_names_in_body(node)
+                indicator_hit = set(pat.get("indicator_vars", [])) & body_names
+                if indicator_hit or (not pat.get("indicator_vars")):
+                    self.findings.append(self._make_vuln(
+                        node, pat["cwe"],
+                        f"[{self._current_class or '?'}.{node.name}] 匹配已知框架漏洞模式",
+                        f"已知模式：{pat['pattern']}。匹配变量：{indicator_hit or '(方法签名匹配)'}",
+                    ))
+        self.generic_visit(node)
+        self._current_func = old
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def _collect_names_in_body(self, node: ast.AST) -> set[str]:
+        names = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name):
+                names.add(child.id)
+            elif isinstance(child, ast.Attribute):
+                names.add(child.attr)
+        return names
+
+
+class DataFlowTracker(ast.NodeVisitor):
+    """Track simple data flow: var_a = tool_response → var_b = f"...{var_a}..." → prompt."""
+
+    def __init__(self, file_path: str, source_lines: list[str]):
+        self.file_path = file_path
+        self.source_lines = source_lines
+        self.findings: list[Vulnerability] = []
+        self._assignments: dict[str, set[str]] = {}
+        self._current_class = ""
+        self._current_func = ""
+        self._vuln_counter = 0
+
+    TOOL_SOURCES = {"observation", "tool_output", "tool_result", "result", "response",
+                    "output", "return_value", "tool_response", "action_output"}
+    PROMPT_SINKS = {"prompt", "message", "messages", "system_message", "human_message",
+                    "content", "template", "instruction", "chat_history", "context"}
+
+    def visit_ClassDef(self, node):
+        old = self._current_class
+        self._current_class = node.name
+        self.generic_visit(node)
+        self._current_class = old
+
+    def visit_FunctionDef(self, node):
+        old_func, old_assigns = self._current_func, self._assignments.copy()
+        self._current_func = node.name
+        self.generic_visit(node)
+        self._current_func = old_func
+        self._assignments = old_assigns
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_Assign(self, node):
+        rhs_names = self._get_all_names(node.value)
+        is_tainted = bool(rhs_names & self.TOOL_SOURCES) or any(
+            rhs_names & self._assignments.get(v, set()) for v in rhs_names
+        )
+        if is_tainted:
+            for target in node.targets:
+                tgt_names = self._get_all_names(target)
+                for name in tgt_names:
+                    self._assignments.setdefault(name, set()).add("tool_response")
+                    if name in self.PROMPT_SINKS or tgt_names & self.PROMPT_SINKS:
+                        self._vuln_counter += 1
+                        cwe = CWE_CATALOG["AGENT-CWE-001"]
+                        snippet_start = max(0, node.lineno - 3)
+                        snippet_end = min(len(self.source_lines), getattr(node, 'end_lineno', node.lineno) + 2)
+                        snippet = "\n".join(f"{snippet_start + i + 1:4d} | {l}" for i, l in enumerate(self.source_lines[snippet_start:snippet_end]))
+                        self.findings.append(Vulnerability(
+                            vuln_id=f"V{self._vuln_counter:04d}",
+                            cwe_id="AGENT-CWE-001",
+                            cwe_name=cwe["name"],
+                            severity="critical",
+                            title=f"数据流追踪：工具响应经变量传递流入 prompt（{name}）",
+                            description=f"{cwe['description']}\n\n数据流：tool_response → {' → '.join(rhs_names & self.TOOL_SOURCES)} → {name}",
+                            location=VulnLocation(
+                                file_path=self.file_path,
+                                line_start=node.lineno,
+                                line_end=getattr(node, 'end_lineno', node.lineno),
+                                code_snippet=snippet,
+                                function_name=self._current_func,
+                                class_name=self._current_class,
+                            ),
+                            recommendation=cwe["recommendation"],
+                            confidence="medium",
+                        ))
+        self.generic_visit(node)
+
+    def _get_all_names(self, node: ast.AST) -> set[str]:
+        names = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name):
+                names.add(child.id)
+            elif isinstance(child, ast.Attribute):
+                names.add(child.attr)
+        return names
+
+
 # ── Call graph builder ───────────────────────────────────────────────────────
 
 class _CallGraphVisitor(ast.NodeVisitor):
@@ -471,7 +668,7 @@ class _CallGraphVisitor(ast.NodeVisitor):
 ALL_VISITORS = [CWE001Visitor, CWE002Visitor, CWE003Visitor, CWE004Visitor, CWE005Visitor]
 
 
-def _scan_file(file_path: str, source: str) -> tuple[list[Vulnerability], list[AuditCallGraphNode], int]:
+def _scan_file(file_path: str, source: str, framework: str = "") -> tuple[list[Vulnerability], list[AuditCallGraphNode], int]:
     """Scan a single Python file. Returns (vulns, call_graph_nodes, line_count)."""
     try:
         tree = ast.parse(source, filename=file_path)
@@ -484,6 +681,15 @@ def _scan_file(file_path: str, source: str) -> tuple[list[Vulnerability], list[A
         v = visitor_cls(file_path, lines)
         v.visit(tree)
         vulns.extend(v.findings)
+
+    if framework and framework in FRAMEWORK_KNOWN_VULNS:
+        fv = FrameworkPatternVisitor(file_path, lines, framework)
+        fv.visit(tree)
+        vulns.extend(fv.findings)
+
+    dft = DataFlowTracker(file_path, lines)
+    dft.visit(tree)
+    vulns.extend(dft.findings)
 
     cg = _CallGraphVisitor(file_path)
     cg.visit(tree)
@@ -521,7 +727,7 @@ def audit_directory(target_path: str, framework: str = "") -> AuditReport:
         except Exception:
             continue
         rel_path = str(pf.relative_to(target))
-        vulns, cg_nodes, lc = _scan_file(rel_path, source)
+        vulns, cg_nodes, lc = _scan_file(rel_path, source, framework=framework)
         all_vulns.extend(vulns)
         all_cg.extend(cg_nodes)
         total_files += 1
@@ -561,22 +767,35 @@ def audit_installed_package(package_name: str) -> AuditReport:
     Usage: audit_installed_package("langchain")
     """
     import importlib
-    try:
-        mod = importlib.import_module(package_name)
-    except ImportError:
+
+    def _empty_report() -> AuditReport:
         return AuditReport(
             report_id=f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
             target=package_name, framework=package_name,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
+    try:
+        mod = importlib.import_module(package_name)
+    except ImportError:
+        alt_names = [
+            package_name.replace("-", "_"),
+            f"{package_name}_core",
+            f"{package_name}.core",
+        ]
+        mod = None
+        for alt in alt_names:
+            try:
+                mod = importlib.import_module(alt)
+                break
+            except ImportError:
+                continue
+        if not mod:
+            return _empty_report()
+
     mod_file = getattr(mod, "__file__", None)
     if not mod_file:
-        return AuditReport(
-            report_id=f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
-            target=package_name, framework=package_name,
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
+        return _empty_report()
 
     pkg_dir = str(Path(mod_file).parent)
     return audit_directory(pkg_dir, framework=package_name)
