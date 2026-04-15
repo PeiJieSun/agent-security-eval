@@ -64,10 +64,13 @@ interface EnvStatus {
   image_present: boolean;
   image_tag: string;
   image_size: string | null;
+  dockerfile_exists: boolean;
+  build_context_path: string;
 }
 
-interface PullStatus {
+interface BuildStatus {
   status: "idle" | "running" | "done" | "error";
+  mode: string;
   phase: string;
   message: string;
   log: string[];
@@ -75,13 +78,14 @@ interface PullStatus {
   started_at: string;
 }
 
-const PULL_PHASE_DEFS = [
-  { id: "connecting",       label: "连接仓库",     desc: "解析 registry 地址与认证" },
-  { id: "pulling_manifest", label: "获取镜像清单", desc: "下载 manifest 与层索引" },
-  { id: "pulling_layers",   label: "拉取镜像层",   desc: "并行下载各层数据" },
-  { id: "extracting",       label: "解压缩",       desc: "展开 tar 层到本地存储" },
-  { id: "finalizing",       label: "校验完整性",   desc: "SHA-256 摘要核对" },
-  { id: "done",             label: "完成",         desc: "镜像已就绪" },
+const BUILD_PHASE_DEFS = [
+  { id: "preparing",  label: "准备上下文", desc: "读取 sandbox/ Dockerfile" },
+  { id: "resolving",  label: "解析基础镜像", desc: "FROM python:3.11-slim" },
+  { id: "fetching",   label: "拉取基础层", desc: "下载 python:3.11-slim 层" },
+  { id: "installing", label: "安装依赖",   desc: "pip install openai pydantic requests" },
+  { id: "copying",    label: "拷贝脚本",   desc: "COPY sandbox_agent.py" },
+  { id: "finishing",  label: "打标签",     desc: "agent-security-eval/sandbox:latest" },
+  { id: "done",       label: "完成",       desc: "镜像已就绪" },
 ];
 
 const FRAMEWORK_COLORS: Record<string, string> = {
@@ -106,9 +110,9 @@ export default function DockerSandboxPage() {
   const [useDocker, setUseDocker] = useState(false);
   const [envStatus, setEnvStatus] = useState<EnvStatus | null>(null);
   const [envLoading, setEnvLoading] = useState(true);
-  const [pullStatus, setPullStatus] = useState<PullStatus | null>(null);
-  const [pulling, setPulling] = useState(false);
-  const pullLogRef = useRef<HTMLDivElement>(null);
+  const [buildStatus, setBuildStatus] = useState<BuildStatus | null>(null);
+  const [building, setBuilding] = useState(false);
+  const buildLogRef = useRef<HTMLDivElement>(null);
 
   const refreshEnv = useCallback(() => {
     setEnvLoading(true);
@@ -124,28 +128,28 @@ export default function DockerSandboxPage() {
     refreshEnv();
   }, [refreshEnv]);
 
-  // Poll pull status while pulling
+  // Poll build status while building
   useEffect(() => {
-    if (!pulling) return;
+    if (!building) return;
     const iv = setInterval(() => {
-      fetch(`${API}/pull-status`)
+      fetch(`${API}/build-status`)
         .then(r => r.json())
-        .then((p: PullStatus) => {
-          setPullStatus(p);
-          if (pullLogRef.current) pullLogRef.current.scrollTop = pullLogRef.current.scrollHeight;
+        .then((p: BuildStatus) => {
+          setBuildStatus(p);
+          if (buildLogRef.current) buildLogRef.current.scrollTop = buildLogRef.current.scrollHeight;
           if (p.status === "done" || p.status === "error") {
-            setPulling(false);
+            setBuilding(false);
             refreshEnv();
           }
         }).catch(() => {});
     }, 800);
     return () => clearInterval(iv);
-  }, [pulling, refreshEnv]);
+  }, [building, refreshEnv]);
 
-  const startPull = async () => {
-    setPulling(true);
-    setPullStatus({ status: "running", phase: "connecting", message: "启动拉取…", log: [], error: "", started_at: "" });
-    await fetch(`${API}/pull-image`, { method: "POST" });
+  const startBuild = async () => {
+    setBuilding(true);
+    setBuildStatus({ status: "running", mode: "build", phase: "preparing", message: "启动构建…", log: [], error: "", started_at: "" });
+    await fetch(`${API}/build-image`, { method: "POST" });
   };
 
   const pollRun = useCallback((runId: string) => {
@@ -295,14 +299,25 @@ export default function DockerSandboxPage() {
             </div>
           ))}
 
-          {/* Pull button */}
-          {envStatus?.daemon_running && !envStatus.image_present && !pulling && (
-            <button
-              onClick={startPull}
-              className="ml-auto px-4 py-1.5 rounded-full bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
-            >
-              拉取镜像 ↓
-            </button>
+          {/* Build button */}
+          {envStatus?.daemon_running && !envStatus.image_present && !building && (
+            <div className="ml-auto flex items-center gap-2">
+              {envStatus.dockerfile_exists ? (
+                <button
+                  onClick={startBuild}
+                  className="px-4 py-1.5 rounded-full bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors flex items-center gap-1.5"
+                >
+                  <span>构建镜像</span>
+                  <span className="text-slate-300">▶</span>
+                </button>
+              ) : (
+                <span className="text-xs text-red-500">sandbox/Dockerfile 未找到</span>
+              )}
+              <span className="text-[10px] text-slate-400 font-mono">{envStatus.build_context_path?.split("/").slice(-2).join("/")}</span>
+            </div>
+          )}
+          {building && (
+            <span className="ml-auto text-xs text-amber-600 animate-pulse font-medium">构建中…</span>
           )}
           {envStatus?.image_present && (
             <div className="ml-auto flex items-center gap-2">
@@ -321,21 +336,21 @@ export default function DockerSandboxPage() {
           )}
         </div>
 
-        {/* Pull progress animation */}
-        {(pulling || pullStatus?.status === "done" || pullStatus?.status === "error") && pullStatus && (
+        {/* Build progress animation */}
+        {(building || buildStatus?.status === "done" || buildStatus?.status === "error") && buildStatus && (
           <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
             {/* Phase steps */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {PULL_PHASE_DEFS.map((ph, i) => {
-                const phases = PULL_PHASE_DEFS.map(p => p.id);
-                const curIdx = phases.indexOf(pullStatus.phase);
+              {BUILD_PHASE_DEFS.map((ph, i) => {
+                const phases = BUILD_PHASE_DEFS.map(p => p.id);
+                const curIdx = phases.indexOf(buildStatus.phase);
                 const phIdx = phases.indexOf(ph.id);
-                const isDone = pullStatus.status === "done" || phIdx < curIdx;
-                const isActive = pullStatus.status === "running" && phIdx === curIdx;
+                const isDone = buildStatus.status === "done" || phIdx < curIdx;
+                const isActive = buildStatus.status === "running" && phIdx === curIdx;
                 return (
                   <div key={ph.id} className="flex items-center gap-1.5 flex-shrink-0">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                      isDone  ? "bg-emerald-500 text-white" :
+                      isDone   ? "bg-emerald-500 text-white" :
                       isActive ? "bg-amber-500 text-white animate-pulse" :
                       "bg-slate-100 text-slate-400"
                     }`}>
@@ -344,7 +359,7 @@ export default function DockerSandboxPage() {
                     <span className={`text-[11px] font-medium whitespace-nowrap ${
                       isDone ? "text-emerald-700" : isActive ? "text-amber-700" : "text-slate-400"
                     }`}>{ph.label}</span>
-                    {i < PULL_PHASE_DEFS.length - 1 && (
+                    {i < BUILD_PHASE_DEFS.length - 1 && (
                       <div className={`w-6 h-px flex-shrink-0 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`} />
                     )}
                   </div>
@@ -354,24 +369,22 @@ export default function DockerSandboxPage() {
 
             {/* Current message */}
             <p className={`text-xs font-mono rounded px-3 py-2 ${
-              pullStatus.status === "error" ? "bg-red-50 text-red-700" :
-              pullStatus.status === "done" ? "bg-emerald-50 text-emerald-700" :
+              buildStatus.status === "error" ? "bg-red-50 text-red-700" :
+              buildStatus.status === "done"  ? "bg-emerald-50 text-emerald-700" :
               "bg-slate-50 text-slate-700"
             }`}>
-              {pullStatus.message || "…"}
+              {buildStatus.message || "…"}
             </p>
 
-            {/* Scrollable log */}
-            {pullStatus.log.length > 0 && (
-              <div
-                ref={pullLogRef}
-                className="bg-slate-900 rounded-lg p-3 max-h-40 overflow-y-auto"
-              >
-                {pullStatus.log.map((line, i) => (
+            {/* Scrollable build log */}
+            {buildStatus.log.length > 0 && (
+              <div ref={buildLogRef} className="bg-slate-900 rounded-lg p-3 max-h-48 overflow-y-auto">
+                {buildStatus.log.map((line, i) => (
                   <p key={i} className={`text-[10px] font-mono leading-5 ${
-                    line.includes("Pull complete") || line.includes("Already exists") ? "text-emerald-400" :
-                    line.includes("Downloading") || line.includes("Extracting") ? "text-amber-300" :
-                    line.includes("Status:") ? "text-blue-300 font-bold" :
+                    line.includes("Successfully") ? "text-emerald-400 font-bold" :
+                    line.includes("RUN") || line.includes("pip") ? "text-amber-300" :
+                    line.includes("COPY") || line.includes("FROM") ? "text-blue-300" :
+                    line.includes("Error") || line.includes("error") ? "text-red-400" :
                     "text-slate-400"
                   }`}>{line}</p>
                 ))}

@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/v1/sandbox")
 
 
 SANDBOX_IMAGE = "agent-security-eval/sandbox:latest"
+_SANDBOX_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "sandbox")
 
 # ── Environment status helpers ────────────────────────────────────────────────
 
@@ -92,14 +93,20 @@ def _detect_env_status() -> dict:
             except ValueError:
                 pass
 
+    # Check if local build context exists
+    build_ctx = os.path.realpath(_SANDBOX_DIR)
+    dockerfile_exists = os.path.exists(os.path.join(build_ctx, "Dockerfile"))
+
     return {
-        "docker_cli":     docker_cli,
-        "docker_version": docker_version,
-        "daemon_running": daemon_running,
-        "runtime":        runtime,
-        "image_present":  image_present,
-        "image_tag":      SANDBOX_IMAGE,
-        "image_size":     image_size,
+        "docker_cli":         docker_cli,
+        "docker_version":     docker_version,
+        "daemon_running":     daemon_running,
+        "runtime":            runtime,
+        "image_present":      image_present,
+        "image_tag":          SANDBOX_IMAGE,
+        "image_size":         image_size,
+        "dockerfile_exists":  dockerfile_exists,
+        "build_context_path": build_ctx,
     }
 
 
@@ -109,43 +116,47 @@ def get_env_status() -> dict:
     return _detect_env_status()
 
 
-# ── Image pull ────────────────────────────────────────────────────────────────
+# ── Image build / pull ────────────────────────────────────────────────────────
 
-# Phase labels used to classify docker pull output lines
-_PULL_PHASES = [
-    ("pulling_manifest", ["Pulling from", "Digest:", "Status:"]),
-    ("pulling_layers",   ["Pulling fs layer", "Waiting", "Downloading"]),
-    ("extracting",       ["Extracting", "Pull complete", "Already exists", "Verifying Checksum"]),
-    ("finalizing",       ["Digest:", "Status:", "docker.io"]),
+# Classify docker build output lines into phases
+_BUILD_PHASE_KEYWORDS = [
+    ("resolving",  ["FROM", "resolve image", "[internal]"]),
+    ("fetching",   ["fetch", "sha256:", "http://", "https://"]),
+    ("installing", ["RUN", "pip install", "apt-get", "npm"]),
+    ("copying",    ["COPY", "ADD"]),
+    ("finishing",  ["exporting", "writing image", "naming", "Successfully built", "Successfully tagged"]),
 ]
 
-_pull_state: dict = {
-    "status": "idle",      # idle | running | done | error
+_build_state: dict = {
+    "status": "idle",   # idle | running | done | error
+    "mode":   "",       # "build" | "pull"
     "phase":  "",
     "message": "",
     "log": [],
     "error": "",
     "started_at": "",
 }
-_pull_lock = threading.Lock()
+_build_lock = threading.Lock()
 
 
-def _classify_phase(line: str) -> Optional[str]:
-    for phase_id, keywords in _PULL_PHASES:
-        if any(kw in line for kw in keywords):
+def _classify_build_phase(line: str) -> Optional[str]:
+    for phase_id, keywords in _BUILD_PHASE_KEYWORDS:
+        if any(kw.lower() in line.lower() for kw in keywords):
             return phase_id
     return None
 
 
-def _do_pull() -> None:
-    global _pull_state
-    with _pull_lock:
-        _pull_state.update({"status": "running", "phase": "connecting",
-                            "message": "连接镜像仓库…", "log": [], "error": "",
-                            "started_at": datetime.now(timezone.utc).isoformat()})
+def _do_build(build_context: str) -> None:
+    with _build_lock:
+        _build_state.update({
+            "status": "running", "mode": "build", "phase": "preparing",
+            "message": f"准备构建上下文：{build_context}",
+            "log": [], "error": "",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        })
     try:
         proc = subprocess.Popen(
-            ["docker", "pull", SANDBOX_IMAGE],
+            ["docker", "build", "--progress=plain", "-t", SANDBOX_IMAGE, build_context],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
@@ -154,49 +165,54 @@ def _do_pull() -> None:
             line = raw.rstrip()
             if not line:
                 continue
-            phase = _classify_phase(line) or _pull_state["phase"]
+            phase = _classify_build_phase(line) or _build_state["phase"]
             phase_label = {
-                "connecting":        "连接镜像仓库",
-                "pulling_manifest":  "解析镜像清单",
-                "pulling_layers":    "拉取镜像层",
-                "extracting":        "解压缩镜像层",
-                "finalizing":        "校验完整性",
+                "preparing":  "准备构建上下文",
+                "resolving":  "解析基础镜像",
+                "fetching":   "拉取基础层",
+                "installing": "安装依赖",
+                "copying":    "拷贝脚本",
+                "finishing":  "打标签完成",
             }.get(phase, phase)
-            with _pull_lock:
-                _pull_state["phase"] = phase
-                _pull_state["message"] = f"{phase_label}：{line[:120]}"
-                _pull_state["log"] = (_pull_state["log"] + [line])[-40:]
-
+            with _build_lock:
+                _build_state["phase"] = phase
+                _build_state["message"] = f"{phase_label}：{line[:120]}"
+                _build_state["log"] = (_build_state["log"] + [line])[-60:]
         proc.wait()
-        with _pull_lock:
+        with _build_lock:
             if proc.returncode == 0:
-                _pull_state.update({"status": "done", "phase": "done",
-                                    "message": "镜像拉取完成，沙箱已就绪 ✓"})
+                _build_state.update({"status": "done", "phase": "done",
+                                     "message": "镜像构建完成，沙箱已就绪 ✓"})
             else:
-                _pull_state.update({"status": "error",
-                                    "message": "拉取失败，见日志",
-                                    "error": "\n".join(_pull_state["log"][-5:])})
+                _build_state.update({
+                    "status": "error",
+                    "message": "构建失败，见日志",
+                    "error": "\n".join(_build_state["log"][-8:]),
+                })
     except Exception as exc:
-        with _pull_lock:
-            _pull_state.update({"status": "error", "message": str(exc), "error": str(exc)})
+        with _build_lock:
+            _build_state.update({"status": "error", "message": str(exc), "error": str(exc)})
 
 
-@router.post("/pull-image", status_code=202)
-def pull_image() -> dict:
-    """Start pulling the sandbox Docker image in the background."""
-    with _pull_lock:
-        if _pull_state["status"] == "running":
+@router.post("/build-image", status_code=202)
+def build_image() -> dict:
+    """Build the sandbox Docker image from the local Dockerfile."""
+    with _build_lock:
+        if _build_state["status"] == "running":
             return {"started": False, "reason": "already_running"}
-    t = threading.Thread(target=_do_pull, daemon=True)
+    build_ctx = os.path.realpath(_SANDBOX_DIR)
+    if not os.path.exists(os.path.join(build_ctx, "Dockerfile")):
+        raise HTTPException(status_code=400, detail=f"Dockerfile not found in {build_ctx}")
+    t = threading.Thread(target=_do_build, args=(build_ctx,), daemon=True)
     t.start()
-    return {"started": True}
+    return {"started": True, "build_context": build_ctx}
 
 
-@router.get("/pull-status")
-def get_pull_status() -> dict:
-    """Return current state of the image pull operation."""
-    with _pull_lock:
-        return dict(_pull_state)
+@router.get("/build-status")
+def get_build_status() -> dict:
+    """Return current state of the image build operation."""
+    with _build_lock:
+        return dict(_build_state)
 
 
 # ── In-memory run store ───────────────────────────────────────────────────────
