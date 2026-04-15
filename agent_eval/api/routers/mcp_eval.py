@@ -35,18 +35,6 @@ class RunMCPRequest(BaseModel):
     base_url: str = "https://api.openai.com/v1"
 
 
-class MCPRunStatus(BaseModel):
-    run_id: str
-    status: str  # "pending" | "running" | "done" | "error"
-    total: int
-    done: int
-    results: list[dict] = []
-    created_at: str = ""
-    error: Optional[str] = None
-
-
-# In-memory run tracking (sufficient for eval use; no persistence needed for runs)
-_mcp_runs: dict[str, MCPRunStatus] = {}
 
 
 # ── Scenario endpoints ────────────────────────────────────────────────────────
@@ -90,14 +78,9 @@ def create_mcp_run(req: RunMCPRequest, background_tasks: BackgroundTasks) -> dic
     """Start an async MCP security evaluation run."""
     run_id = str(uuid.uuid4())[:8]
     scenario_ids = req.scenario_ids or [s.scenario_id for s in MCP_SCENARIOS]
-    status = MCPRunStatus(
-        run_id=run_id,
-        status="pending",
-        total=len(scenario_ids),
-        done=0,
-        created_at=datetime.now(timezone.utc).isoformat(),
-    )
-    _mcp_runs[run_id] = status
+    
+    _store.create_mcp_run(run_id=run_id, model=req.model, total=len(scenario_ids))
+    
     background_tasks.add_task(
         _run_mcp_background,
         run_id=run_id,
@@ -112,15 +95,16 @@ def create_mcp_run(req: RunMCPRequest, background_tasks: BackgroundTasks) -> dic
 @router.get("/runs")
 def list_mcp_runs() -> list[dict]:
     """List recent MCP evaluation runs."""
-    return [r.model_dump() for r in sorted(_mcp_runs.values(), key=lambda r: r.created_at, reverse=True)]
+    return _store.list_mcp_runs(limit=50)
 
 
 @router.get("/runs/{run_id}")
 def get_mcp_run(run_id: str) -> dict:
     """Get status and results of a specific MCP evaluation run."""
-    if run_id not in _mcp_runs:
+    try:
+        return _store.get_mcp_run(run_id)
+    except KeyError:
         raise HTTPException(status_code=404, detail=f"run {run_id!r} not found")
-    return _mcp_runs[run_id].model_dump()
 
 
 # ── Background task ───────────────────────────────────────────────────────────
@@ -132,23 +116,23 @@ def _run_mcp_background(
     api_key: str,
     base_url: str,
 ) -> None:
-    status = _mcp_runs[run_id]
-    status.status = "running"
-
+    _store.update_mcp_run(run_id, status="running")
     runner = MCPEvalRunner(api_key=api_key, base_url=base_url, model=model)
+    done = 0
 
     async def _run() -> None:
+        nonlocal done
         for sid in scenario_ids:
             if sid not in MCP_SCENARIOS_BY_ID:
                 continue
             scenario = MCP_SCENARIOS_BY_ID[sid]
             result = await runner.run_scenario(scenario)
-            status.results.append(result.model_dump())
-            status.done += 1
+            _store.save_mcp_result(run_id, sid, result.model_dump())
+            done += 1
+            _store.update_mcp_run(run_id, done_count=done)
 
     try:
         asyncio.run(_run())
-        status.status = "done"
+        _store.update_mcp_run(run_id, status="done")
     except Exception as e:
-        status.status = "error"
-        status.error = str(e)
+        _store.update_mcp_run(run_id, status="error", error=str(e))

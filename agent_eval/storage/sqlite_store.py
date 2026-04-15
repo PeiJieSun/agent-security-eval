@@ -126,6 +126,23 @@ class SqliteStore:
                     json_blob   TEXT NOT NULL,
                     created_at  TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS mcp_runs (
+                    run_id      TEXT PRIMARY KEY,
+                    model       TEXT NOT NULL,
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    total       INTEGER NOT NULL DEFAULT 0,
+                    done_count  INTEGER NOT NULL DEFAULT 0,
+                    error       TEXT,
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS mcp_results (
+                    run_id      TEXT NOT NULL,
+                    scenario_id TEXT NOT NULL,
+                    json_blob   TEXT NOT NULL,
+                    created_at  TEXT NOT NULL,
+                    PRIMARY KEY (run_id, scenario_id)
+                );
                 CREATE TABLE IF NOT EXISTS behavior_snapshots (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     eval_id     TEXT NOT NULL,
@@ -566,3 +583,88 @@ class SqliteStore:
             d["results"] = json.loads(d["results"])
             result.append(d)
         return result
+
+    # ── M4-4: MCP Security ──────────────────────────────────────────────────
+
+    def create_mcp_run(
+        self,
+        run_id: str,
+        model: str,
+        total: int,
+    ) -> None:
+        now = _now()
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO mcp_runs (run_id, model, status, total, done_count, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (run_id, model, "pending", total, 0, now, now),
+            )
+
+    def update_mcp_run(
+        self,
+        run_id: str,
+        status: Optional[str] = None,
+        done_count: Optional[int] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        now = _now()
+        with self._conn() as con:
+            if status is not None:
+                con.execute(
+                    "UPDATE mcp_runs SET status=?, updated_at=? WHERE run_id=?",
+                    (status, now, run_id),
+                )
+            if done_count is not None:
+                con.execute(
+                    "UPDATE mcp_runs SET done_count=?, updated_at=? WHERE run_id=?",
+                    (done_count, now, run_id),
+                )
+            if error is not None:
+                con.execute(
+                    "UPDATE mcp_runs SET error=?, updated_at=? WHERE run_id=?",
+                    (error, now, run_id),
+                )
+
+    def save_mcp_result(self, run_id: str, scenario_id: str, result_dict: dict) -> None:
+        now = _now()
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT OR REPLACE INTO mcp_results (run_id, scenario_id, json_blob, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (run_id, scenario_id, json.dumps(result_dict), now),
+            )
+
+    def get_mcp_run(self, run_id: str) -> dict:
+        with self._conn() as con:
+            row = con.execute("SELECT * FROM mcp_runs WHERE run_id=?", (run_id,)).fetchone()
+            if row is None:
+                raise KeyError(f"run_id {run_id!r} not found")
+            d = dict(row)
+            # rename done_count -> done for compatibility with frontend/api
+            d["done"] = d.pop("done_count")
+
+            # fetch results
+            results = []
+            res_rows = con.execute(
+                "SELECT json_blob FROM mcp_results WHERE run_id=? ORDER BY created_at ASC",
+                (run_id,)
+            ).fetchall()
+            for rrow in res_rows:
+                results.append(json.loads(rrow["json_blob"]))
+            d["results"] = results
+            return d
+
+    def list_mcp_runs(self, limit: int = 50) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute("SELECT * FROM mcp_runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        out = []
+        for row in rows:
+            d = dict(row)
+            d["done"] = d.pop("done_count")
+            d["results"] = []  # Exclude raw results for list view performance
+            out.append(d)
+        return out
