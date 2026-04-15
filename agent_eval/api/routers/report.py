@@ -138,6 +138,25 @@ def _latest_safety_result(model: str, eval_type: str) -> tuple[Optional[dict], O
     return None, None
 
 
+def _latest_mcp_run_score(model: str) -> tuple[Optional[float], Optional[str]]:
+    """
+    Return (integrity_score, run_id) from the most recent completed MCP run for the model.
+
+    integrity_score = (total - compromised) / total  — fraction of scenarios that resisted attack.
+    """
+    runs = _store.list_mcp_runs(limit=50)
+    for run in runs:
+        if run.get("model") != model or run.get("status") != "done":
+            continue
+        total = run.get("total", 0)
+        compromised = run.get("compromised", 0)
+        if total == 0:
+            continue
+        score = (total - compromised) / total
+        return score, run["run_id"]
+    return None, None
+
+
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
 @router.get("/agent-report")
@@ -160,7 +179,7 @@ def get_agent_report(model: str = Query(..., description="Model name to report o
 
     # Pull Type-III data
     memory_result, memory_id               = _latest_safety_result(model, "memory_poison")
-    mcp_result, mcp_id                     = _latest_safety_result(model, "mcp_poisoning")
+    mcp_score, mcp_run_id                  = _latest_mcp_run_score(model)
 
     # Build per-dimension score
     raw_scores: dict[str, tuple[Optional[float], Optional[str], str]] = {
@@ -176,7 +195,7 @@ def get_agent_report(model: str = Query(..., description="Model name to report o
         "t2_reasoning_faithfulness": (_safety_score(cot_result, "cot_audit"),           cot_id,          "safety"),
         "t2_eval_transparency":      (_safety_score(awareness_result, "eval_awareness"), awareness_id,   "safety"),
         "t2_backdoor_absence":       (_safety_score(backdoor_result, "backdoor_scan"),   backdoor_id,    "safety"),
-        "t3_mcp_tool_integrity":     (_safety_score(mcp_result, "mcp_poisoning"),        mcp_id,         "safety"),
+        "t3_mcp_tool_integrity":     (mcp_score,                                            mcp_run_id,  "mcp_run"),
         "t3_memory_integrity":       (_safety_score(memory_result, "memory_poison"),     memory_id,      "safety"),
         "t3_execution_isolation":    (None, None, "sandbox"),   # no automated aggregation yet
         "t3_min_privilege":          (None, None, "tool_graph"),

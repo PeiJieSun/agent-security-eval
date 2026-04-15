@@ -55,6 +55,7 @@ const SOURCE_LABEL: Record<string, string> = {
   safety:     "安全评测",
   sandbox:    "Docker 沙箱",
   tool_graph: "工具调用图",
+  mcp_run:    "MCP 安全测评",
 };
 
 // Severity: filled chip with background
