@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,34 @@ interface SandboxRun {
 
 const API = "http://localhost:18002/api/v1/sandbox";
 
+interface EnvStatus {
+  docker_cli: boolean;
+  docker_version: string | null;
+  daemon_running: boolean;
+  runtime: string;
+  image_present: boolean;
+  image_tag: string;
+  image_size: string | null;
+}
+
+interface PullStatus {
+  status: "idle" | "running" | "done" | "error";
+  phase: string;
+  message: string;
+  log: string[];
+  error: string;
+  started_at: string;
+}
+
+const PULL_PHASE_DEFS = [
+  { id: "connecting",       label: "连接仓库",     desc: "解析 registry 地址与认证" },
+  { id: "pulling_manifest", label: "获取镜像清单", desc: "下载 manifest 与层索引" },
+  { id: "pulling_layers",   label: "拉取镜像层",   desc: "并行下载各层数据" },
+  { id: "extracting",       label: "解压缩",       desc: "展开 tar 层到本地存储" },
+  { id: "finalizing",       label: "校验完整性",   desc: "SHA-256 摘要核对" },
+  { id: "done",             label: "完成",         desc: "镜像已就绪" },
+];
+
 const FRAMEWORK_COLORS: Record<string, string> = {
   openai_agents: "bg-green-50 border-green-200 text-green-700",
   langchain:     "bg-blue-50 border-blue-200 text-blue-700",
@@ -76,11 +104,49 @@ export default function DockerSandboxPage() {
   const [polling, setPolling] = useState(false);
   const [activeTab, setActiveTab] = useState<"scenarios" | "results" | "history">("scenarios");
   const [useDocker, setUseDocker] = useState(false);
+  const [envStatus, setEnvStatus] = useState<EnvStatus | null>(null);
+  const [envLoading, setEnvLoading] = useState(true);
+  const [pullStatus, setPullStatus] = useState<PullStatus | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const pullLogRef = useRef<HTMLDivElement>(null);
+
+  const refreshEnv = useCallback(() => {
+    setEnvLoading(true);
+    fetch(`${API}/env-status`)
+      .then(r => r.json())
+      .then((s: EnvStatus) => { setEnvStatus(s); setEnvLoading(false); })
+      .catch(() => setEnvLoading(false));
+  }, []);
 
   useEffect(() => {
     fetch(`${API}/scenarios`).then((r) => r.json()).then(setScenarios).catch(console.error);
     fetch(`${API}/runs`).then((r) => r.json()).then(setRuns).catch(console.error);
-  }, []);
+    refreshEnv();
+  }, [refreshEnv]);
+
+  // Poll pull status while pulling
+  useEffect(() => {
+    if (!pulling) return;
+    const iv = setInterval(() => {
+      fetch(`${API}/pull-status`)
+        .then(r => r.json())
+        .then((p: PullStatus) => {
+          setPullStatus(p);
+          if (pullLogRef.current) pullLogRef.current.scrollTop = pullLogRef.current.scrollHeight;
+          if (p.status === "done" || p.status === "error") {
+            setPulling(false);
+            refreshEnv();
+          }
+        }).catch(() => {});
+    }, 800);
+    return () => clearInterval(iv);
+  }, [pulling, refreshEnv]);
+
+  const startPull = async () => {
+    setPulling(true);
+    setPullStatus({ status: "running", phase: "connecting", message: "启动拉取…", log: [], error: "", started_at: "" });
+    await fetch(`${API}/pull-image`, { method: "POST" });
+  };
 
   const pollRun = useCallback((runId: string) => {
     setPolling(true);
@@ -169,6 +235,150 @@ export default function DockerSandboxPage() {
             {useDocker ? "真实 Docker 模式" : "模拟模式"}
           </span>
         </p>
+      </div>
+
+      {/* ── Environment readiness panel ───────────────────────────────── */}
+      <div className={`mb-6 rounded-xl border overflow-hidden ${
+        envStatus?.image_present ? "border-emerald-200 bg-emerald-50/40" :
+        envStatus?.daemon_running ? "border-amber-200 bg-amber-50/40" :
+        "border-slate-200 bg-white"
+      }`}>
+        {/* Header bar */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-current/10">
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+            envStatus?.image_present ? "bg-emerald-500" :
+            envStatus?.daemon_running ? "bg-amber-400 animate-pulse" :
+            envLoading ? "bg-slate-300 animate-pulse" :
+            "bg-red-400"
+          }`} />
+          <span className="text-sm font-bold text-slate-800">
+            {envStatus?.image_present ? "沙箱环境就绪" :
+             envStatus?.daemon_running ? "Docker 运行中，镜像未拉取" :
+             envLoading ? "正在检测环境…" :
+             "Docker 未就绪"}
+          </span>
+          {envStatus && (
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ml-auto ${
+              envStatus.runtime === "orbstack"
+                ? "bg-violet-50 border-violet-200 text-violet-700"
+                : envStatus.runtime === "docker_desktop"
+                ? "bg-blue-50 border-blue-200 text-blue-700"
+                : "bg-slate-50 border-slate-200 text-slate-500"
+            }`}>
+              {envStatus.runtime === "orbstack" ? "OrbStack ✓" :
+               envStatus.runtime === "docker_desktop" ? "Docker Desktop" :
+               envStatus.daemon_running ? envStatus.runtime : "runtime 未知"}
+            </span>
+          )}
+          <button onClick={refreshEnv} className="ml-2 text-slate-400 hover:text-slate-700 text-xs transition-colors" title="刷新">↺</button>
+        </div>
+
+        {/* Status chips row */}
+        <div className="flex items-center gap-3 px-5 py-3 flex-wrap">
+          {[
+            { label: "docker CLI", ok: envStatus?.docker_cli, detail: envStatus?.docker_version ? `v${envStatus.docker_version}` : undefined },
+            { label: "daemon 运行", ok: envStatus?.daemon_running },
+            { label: "镜像已拉取", ok: envStatus?.image_present, detail: envStatus?.image_size ?? undefined },
+          ].map(chip => (
+            <div key={chip.label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs ${
+              chip.ok === undefined
+                ? "border-slate-200 text-slate-400 bg-white"
+                : chip.ok
+                ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                : "border-red-300 text-red-600 bg-red-50"
+            }`}>
+              <span className={`text-[10px] font-bold ${chip.ok === undefined ? "text-slate-300" : chip.ok ? "text-emerald-600" : "text-red-500"}`}>
+                {chip.ok === undefined ? "?" : chip.ok ? "✓" : "✗"}
+              </span>
+              {chip.label}
+              {chip.detail && <span className="font-mono text-[10px] opacity-70">({chip.detail})</span>}
+            </div>
+          ))}
+
+          {/* Pull button */}
+          {envStatus?.daemon_running && !envStatus.image_present && !pulling && (
+            <button
+              onClick={startPull}
+              className="ml-auto px-4 py-1.5 rounded-full bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
+            >
+              拉取镜像 ↓
+            </button>
+          )}
+          {envStatus?.image_present && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-emerald-700 font-medium">{envStatus.image_tag}</span>
+              <button
+                onClick={() => setUseDocker(u => !u)}
+                className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${
+                  useDocker
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-300 text-slate-600 hover:border-slate-500"
+                }`}
+              >
+                {useDocker ? "真实沙箱 ON" : "开启真实沙箱"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Pull progress animation */}
+        {(pulling || pullStatus?.status === "done" || pullStatus?.status === "error") && pullStatus && (
+          <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
+            {/* Phase steps */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {PULL_PHASE_DEFS.map((ph, i) => {
+                const phases = PULL_PHASE_DEFS.map(p => p.id);
+                const curIdx = phases.indexOf(pullStatus.phase);
+                const phIdx = phases.indexOf(ph.id);
+                const isDone = pullStatus.status === "done" || phIdx < curIdx;
+                const isActive = pullStatus.status === "running" && phIdx === curIdx;
+                return (
+                  <div key={ph.id} className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                      isDone  ? "bg-emerald-500 text-white" :
+                      isActive ? "bg-amber-500 text-white animate-pulse" :
+                      "bg-slate-100 text-slate-400"
+                    }`}>
+                      {isDone ? "✓" : isActive ? "▶" : i + 1}
+                    </div>
+                    <span className={`text-[11px] font-medium whitespace-nowrap ${
+                      isDone ? "text-emerald-700" : isActive ? "text-amber-700" : "text-slate-400"
+                    }`}>{ph.label}</span>
+                    {i < PULL_PHASE_DEFS.length - 1 && (
+                      <div className={`w-6 h-px flex-shrink-0 ${isDone ? "bg-emerald-300" : "bg-slate-200"}`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Current message */}
+            <p className={`text-xs font-mono rounded px-3 py-2 ${
+              pullStatus.status === "error" ? "bg-red-50 text-red-700" :
+              pullStatus.status === "done" ? "bg-emerald-50 text-emerald-700" :
+              "bg-slate-50 text-slate-700"
+            }`}>
+              {pullStatus.message || "…"}
+            </p>
+
+            {/* Scrollable log */}
+            {pullStatus.log.length > 0 && (
+              <div
+                ref={pullLogRef}
+                className="bg-slate-900 rounded-lg p-3 max-h-40 overflow-y-auto"
+              >
+                {pullStatus.log.map((line, i) => (
+                  <p key={i} className={`text-[10px] font-mono leading-5 ${
+                    line.includes("Pull complete") || line.includes("Already exists") ? "text-emerald-400" :
+                    line.includes("Downloading") || line.includes("Extracting") ? "text-amber-300" :
+                    line.includes("Status:") ? "text-blue-300 font-bold" :
+                    "text-slate-400"
+                  }`}>{line}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

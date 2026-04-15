@@ -6,6 +6,9 @@ Runs in mock mode by default; set DOCKER_AVAILABLE=true for real Docker executio
 """
 from __future__ import annotations
 
+import os
+import subprocess
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -23,6 +26,177 @@ from agent_eval.docker_sandbox import (
 )
 
 router = APIRouter(prefix="/api/v1/sandbox")
+
+
+SANDBOX_IMAGE = "agent-security-eval/sandbox:latest"
+
+# ── Environment status helpers ────────────────────────────────────────────────
+
+def _run(cmd: list[str], timeout: int = 8) -> tuple[int, str, str]:
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout.strip(), r.stderr.strip()
+    except FileNotFoundError:
+        return -1, "", "command not found"
+    except subprocess.TimeoutExpired:
+        return -2, "", "timeout"
+
+
+def _detect_env_status() -> dict:
+    # Docker CLI present?
+    rc, ver_out, _ = _run(["docker", "--version"])
+    docker_cli = rc == 0
+    docker_version: Optional[str] = None
+    if docker_cli and ver_out:
+        # "Docker version 27.3.1, build ..."
+        parts = ver_out.split()
+        docker_version = parts[2].rstrip(",") if len(parts) >= 3 else ver_out[:20]
+
+    # Daemon running?
+    rc2, info_out, _ = _run(["docker", "info", "--format", "{{.ServerVersion}}"], timeout=6)
+    daemon_running = rc2 == 0
+
+    # OrbStack vs Docker Desktop
+    runtime = "unknown"
+    if daemon_running:
+        rc3, ctx_out, _ = _run(["docker", "context", "show"])
+        if rc3 == 0:
+            ctx = ctx_out.lower()
+            if "orbstack" in ctx or "orb" in ctx:
+                runtime = "orbstack"
+            elif "desktop" in ctx:
+                runtime = "docker_desktop"
+            else:
+                runtime = ctx.strip() or "docker"
+        # Fallback: check info for OrbStack signature
+        if runtime == "unknown":
+            rc4, full_info, _ = _run(["docker", "info"])
+            if "orbstack" in full_info.lower():
+                runtime = "orbstack"
+
+    # Image present?
+    rc5, img_id, _ = _run(["docker", "images", "-q", SANDBOX_IMAGE])
+    image_present = rc5 == 0 and bool(img_id.strip())
+
+    # Image size
+    image_size: Optional[str] = None
+    if image_present:
+        rc6, size_out, _ = _run([
+            "docker", "image", "inspect", SANDBOX_IMAGE,
+            "--format", "{{.Size}}"
+        ])
+        if rc6 == 0 and size_out:
+            try:
+                sz = int(size_out.strip())
+                image_size = f"{sz / 1e9:.1f} GB" if sz > 1e9 else f"{sz / 1e6:.0f} MB"
+            except ValueError:
+                pass
+
+    return {
+        "docker_cli":     docker_cli,
+        "docker_version": docker_version,
+        "daemon_running": daemon_running,
+        "runtime":        runtime,
+        "image_present":  image_present,
+        "image_tag":      SANDBOX_IMAGE,
+        "image_size":     image_size,
+    }
+
+
+@router.get("/env-status")
+def get_env_status() -> dict:
+    """Check Docker environment readiness for real sandbox execution."""
+    return _detect_env_status()
+
+
+# ── Image pull ────────────────────────────────────────────────────────────────
+
+# Phase labels used to classify docker pull output lines
+_PULL_PHASES = [
+    ("pulling_manifest", ["Pulling from", "Digest:", "Status:"]),
+    ("pulling_layers",   ["Pulling fs layer", "Waiting", "Downloading"]),
+    ("extracting",       ["Extracting", "Pull complete", "Already exists", "Verifying Checksum"]),
+    ("finalizing",       ["Digest:", "Status:", "docker.io"]),
+]
+
+_pull_state: dict = {
+    "status": "idle",      # idle | running | done | error
+    "phase":  "",
+    "message": "",
+    "log": [],
+    "error": "",
+    "started_at": "",
+}
+_pull_lock = threading.Lock()
+
+
+def _classify_phase(line: str) -> Optional[str]:
+    for phase_id, keywords in _PULL_PHASES:
+        if any(kw in line for kw in keywords):
+            return phase_id
+    return None
+
+
+def _do_pull() -> None:
+    global _pull_state
+    with _pull_lock:
+        _pull_state.update({"status": "running", "phase": "connecting",
+                            "message": "连接镜像仓库…", "log": [], "error": "",
+                            "started_at": datetime.now(timezone.utc).isoformat()})
+    try:
+        proc = subprocess.Popen(
+            ["docker", "pull", SANDBOX_IMAGE],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+        )
+        assert proc.stdout is not None
+        for raw in proc.stdout:
+            line = raw.rstrip()
+            if not line:
+                continue
+            phase = _classify_phase(line) or _pull_state["phase"]
+            phase_label = {
+                "connecting":        "连接镜像仓库",
+                "pulling_manifest":  "解析镜像清单",
+                "pulling_layers":    "拉取镜像层",
+                "extracting":        "解压缩镜像层",
+                "finalizing":        "校验完整性",
+            }.get(phase, phase)
+            with _pull_lock:
+                _pull_state["phase"] = phase
+                _pull_state["message"] = f"{phase_label}：{line[:120]}"
+                _pull_state["log"] = (_pull_state["log"] + [line])[-40:]
+
+        proc.wait()
+        with _pull_lock:
+            if proc.returncode == 0:
+                _pull_state.update({"status": "done", "phase": "done",
+                                    "message": "镜像拉取完成，沙箱已就绪 ✓"})
+            else:
+                _pull_state.update({"status": "error",
+                                    "message": "拉取失败，见日志",
+                                    "error": "\n".join(_pull_state["log"][-5:])})
+    except Exception as exc:
+        with _pull_lock:
+            _pull_state.update({"status": "error", "message": str(exc), "error": str(exc)})
+
+
+@router.post("/pull-image", status_code=202)
+def pull_image() -> dict:
+    """Start pulling the sandbox Docker image in the background."""
+    with _pull_lock:
+        if _pull_state["status"] == "running":
+            return {"started": False, "reason": "already_running"}
+    t = threading.Thread(target=_do_pull, daemon=True)
+    t.start()
+    return {"started": True}
+
+
+@router.get("/pull-status")
+def get_pull_status() -> dict:
+    """Return current state of the image pull operation."""
+    with _pull_lock:
+        return dict(_pull_state)
 
 
 # ── In-memory run store ───────────────────────────────────────────────────────
