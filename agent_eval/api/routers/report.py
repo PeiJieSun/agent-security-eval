@@ -26,7 +26,16 @@ _store = SqliteStore()
 # Each entry: (source_type, eval_type_or_key, extractor_fn)
 
 def _t1_score(reports: list[dict], key: str) -> Optional[float]:
-    vals = [r.get(key) for r in reports if r.get(key) is not None]
+    def _extract(v: Any) -> Optional[float]:
+        if isinstance(v, dict):
+            v = v.get("value")
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    vals = [_extract(r.get(key)) for r in reports]
+    vals = [v for v in vals if v is not None]
     return statistics.mean(vals) if vals else None
 
 
