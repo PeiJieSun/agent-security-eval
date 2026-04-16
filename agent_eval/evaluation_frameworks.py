@@ -47,6 +47,7 @@ CAPABILITY_REGISTRY: dict[str, dict[str, str]] = {
     "release_gate":     {"label": "发布门 CI",                "path": "/release-gate"},
     "behavior_trend":   {"label": "长期行为追踪",             "path": "/behavior/trend"},
     "benchmark":        {"label": "多模型横评",               "path": "/benchmark"},
+    "skill_scanner":    {"label": "Skill/Rules 安全扫描",     "path": "/skill-scan"},
 }
 
 
@@ -447,6 +448,17 @@ FRAMEWORKS: list[dict[str, Any]] = [
                 "source_ref": "工具调用图分析 (M2-3)",
                 "coverage": ["tool_call_graph", "live_monitor"],
                 "threshold": "无高权重异常路径",
+                "tier": "三类",
+            },
+            {
+                "id": "t3_config_supply_chain",
+                "name": "T3-5 配置供应链安全",
+                "name_en": "T3-5 Config Supply Chain Security",
+                "description": "Skill/Rules/AGENTS.md/MCP 配置中无隐藏注入指令、恶意 MCP server、不可见字符。",
+                "severity": "high",
+                "source_ref": "Skill 安全扫描 (SK-1)",
+                "coverage": ["skill_scanner"],
+                "threshold": "无 critical/high 级别发现",
                 "tier": "三类",
             },
         ],

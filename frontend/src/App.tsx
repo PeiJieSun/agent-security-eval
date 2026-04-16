@@ -36,6 +36,7 @@ import DeepAnalysisPage from "./pages/DeepAnalysisPage";
 import FormalVerificationPage from "./pages/FormalVerificationPage";
 import TrajectoryImportPage from "./pages/TrajectoryImportPage";
 import MCPProxyPage from "./pages/MCPProxyPage";
+import SkillScanPage from "./pages/SkillScanPage";
 
 export default function App() {
   return (
@@ -112,6 +113,8 @@ export default function App() {
           <Route path="/import" element={<TrajectoryImportPage />} />
           {/* MCP Proxy */}
           <Route path="/mcp-proxy" element={<MCPProxyPage />} />
+          {/* Skill Security Scan */}
+          <Route path="/skill-scan" element={<SkillScanPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

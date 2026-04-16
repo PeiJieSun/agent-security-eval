@@ -59,6 +59,7 @@ const NAV: NavSection[] = [
     items: [
       { label: "轨迹导入", path: "/import", desc: "导入 Claude Code / Codex / MCP 等外部 Agent 日志" },
       { label: "MCP 安全代理", path: "/mcp-proxy", desc: "透明拦截 Agent 与 MCP Server 之间的通信" },
+      { label: "Skill 安全扫描", path: "/skill-scan", desc: "扫描 SKILL.md / Rules / AGENTS.md / MCP 配置中的隐藏指令" },
     ],
   },
   {
