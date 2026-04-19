@@ -37,6 +37,7 @@ import FormalVerificationPage from "./pages/FormalVerificationPage";
 import TrajectoryImportPage from "./pages/TrajectoryImportPage";
 import MCPProxyPage from "./pages/MCPProxyPage";
 import SkillScanPage from "./pages/SkillScanPage";
+import LiteraturePage from "./pages/LiteraturePage";
 
 export default function App() {
   return (
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="/mcp-proxy" element={<MCPProxyPage />} />
           {/* Skill Security Scan */}
           <Route path="/skill-scan" element={<SkillScanPage />} />
+          <Route path="/literature" element={<LiteraturePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

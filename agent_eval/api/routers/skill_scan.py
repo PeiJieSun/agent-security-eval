@@ -211,3 +211,55 @@ def get_deep_layer(scan_id: str, layer: str):
                     return lr.model_dump()
             raise HTTPException(404, f"Layer {layer} not found in report {scan_id}")
     raise HTTPException(404, f"Deep scan report {scan_id} not found")
+
+
+# ---------------------------------------------------------------------------
+# Batch testing endpoints
+# ---------------------------------------------------------------------------
+
+_batch_history: list[dict] = []
+
+
+class BatchTestRequest(BaseModel):
+    layers: list[str] = ["L1", "L2", "L4", "L5"]
+    include_adversarial: bool = True
+    include_benign: bool = True
+    model: str = ""
+
+
+@router.post("/benchmark/run")
+async def run_benchmark(req: BatchTestRequest):
+    """Run batch benchmark on built-in adversarial + benign samples."""
+    from agent_eval.skill_scanner.benchmark import (
+        run_batch, ADVERSARIAL_SAMPLES, BENIGN_SAMPLES,
+    )
+    samples = []
+    if req.include_adversarial:
+        samples.extend(ADVERSARIAL_SAMPLES)
+    if req.include_benign:
+        samples.extend(BENIGN_SAMPLES)
+    if not samples:
+        raise HTTPException(400, "No samples selected")
+
+    model = req.model or settings.default_model
+    result = await run_batch(
+        samples=samples, layers=req.layers,
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url,
+        model=model,
+    )
+    result_dict = result.model_dump()
+    _batch_history.append(result_dict)
+    return result_dict
+
+
+@router.get("/benchmark/samples")
+def list_samples():
+    """List all built-in benchmark samples."""
+    from agent_eval.skill_scanner.benchmark import ALL_SAMPLES
+    return [s.model_dump() for s in ALL_SAMPLES]
+
+
+@router.get("/benchmark/history")
+def list_batch_history():
+    return list(reversed(_batch_history[-20:]))

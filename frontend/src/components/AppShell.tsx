@@ -59,7 +59,8 @@ const NAV: NavSection[] = [
     items: [
       { label: "轨迹导入", path: "/import", desc: "导入 Claude Code / Codex / MCP 等外部 Agent 日志" },
       { label: "MCP 安全代理", path: "/mcp-proxy", desc: "透明拦截 Agent 与 MCP Server 之间的通信" },
-      { label: "Skill 安全扫描", path: "/skill-scan", desc: "扫描 SKILL.md / Rules / AGENTS.md / MCP 配置中的隐藏指令" },
+      { label: "Skill 安全扫描", path: "/skill-scan", desc: "五层深度分析: 文本 → 能力 → 行为 → 供应链 → 组合" },
+      { label: "文献调研", path: "/literature", desc: "学术景观、本工作定位、批量评测基准" },
     ],
   },
   {
